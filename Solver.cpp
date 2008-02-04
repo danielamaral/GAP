@@ -2,12 +2,12 @@
 #include "ProblemData.h"
 #include <stdio.h>
 
-Solver::Solver(ProblemData *aProblemData)
+Solver::Solver(ProblemData* aProblemData)
 {
-   problemData = aProblemData;
+   problem_data_ = aProblemData;
 }
 
 Solver::~Solver()
 {
-   problemData = NULL;
+   problem_data_ = NULL;
 }

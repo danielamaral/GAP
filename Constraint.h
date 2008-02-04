@@ -1,5 +1,4 @@
-#ifndef CONSTRAINT_H_
-#define CONSTRAINT_H_
+#pragma once
 
 #include <hash_map>
 
@@ -45,13 +44,15 @@ public:
 	 * Returns a string containing an unique name for the constraint.
 	 * @return a string containing an unique name for the constraint.
 	 */
-	std::string toString();
+	std::string ToString();
 
    //==================================================
    // GET METHODS 
    //==================================================
    //Return constraint type
-   ConstraintType getType() const            { return type; }
+   ConstraintType type() const {
+       return type_;
+   }
 
    /*
    ToDo:
@@ -64,7 +65,9 @@ public:
    // Reset variables values
    void reset();
    // Set constraint type
-   void setType(ConstraintType t)               { type = t; }
+   void set_type(ConstraintType t) {
+       type_ = t;
+   }
 
    /*
    ToDo:
@@ -74,7 +77,7 @@ public:
 private:
 
 	/** Attribute which defines the constraint type of the instance. */
-	ConstraintType type;
+	ConstraintType type_;
 
 	/**
 	ToDo:
@@ -109,5 +112,3 @@ public:
  * Type definition for the hash object.
  */
 typedef stdext::hash_map<Constraint, int, ConstraintHasher> ConstraintHash;
-
-#endif

@@ -32,5 +32,5 @@ public:
 
 protected:
    /** A reference to the problem's input data. */
-   ProblemData *problemData;
+   ProblemData* problem_data_;
 };

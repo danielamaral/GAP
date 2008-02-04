@@ -34,9 +34,9 @@ Variable& Variable::operator=(const Variable& var)
 
 bool Variable::operator <(const Variable& var) const
 {
-   if( (int)this->getType() < (int) var.getType() )
+   if( (int)this->type() < (int) var.type() )
       return true;
-   else if( (int)this->getType() > (int) var.getType() )
+   else if( (int)this->type() > (int) var.type() )
       return false;
 
 	/*

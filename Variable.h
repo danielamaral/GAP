@@ -1,7 +1,4 @@
-// Copyright (C) 1991 - 1999 Rational Software Corporation
-
-#ifndef _VARIABLE
-#define _VARIABLE
+#pragma once
 
 #include <map>
 #include <hash_map>
@@ -30,10 +27,14 @@ public:
    // GET METHODS 
    //==================================================
    //Return variable type
-   VariableType getType() const { return type; }
+   VariableType type() const {
+       return type_;
+   }
 
     // Return value
-   double getValue() const { return value; }
+   double value() const {
+       return value_;
+   }
 
    /*
    ToDo:
@@ -47,10 +48,14 @@ public:
    void reset();
 
    // Set variable type
-   void setType(VariableType t)                 { type = t; }
+   void set_type(VariableType t) {
+       type_ = t;
+   }
 
    // Set value
-   void setValue(double v)                      { value = v; }
+   void set_value(double v) {
+       value_ = v;
+   }
 
    /*
    ToDo:
@@ -71,8 +76,8 @@ public:
    std::string toString();
 
 private:
-   VariableType type;
-   double value;
+   VariableType type_;
+   double value_;
    
    /* ToDo:
       All attributes that define a variable should be declared here
@@ -95,5 +100,3 @@ public:
  * Type definition for the hash object.
  */
 typedef stdext::hash_map<Variable, int, VariableHasher> VariableHash;
-
-#endif 

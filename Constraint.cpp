@@ -1,6 +1,7 @@
 #include "Constraint.h"
-#include "HashUtil.h"
-#include <stdio.h>
+
+#include <cstdio>
+#include <sstream>
 
 Constraint::Constraint()
 {
@@ -33,9 +34,9 @@ Constraint& Constraint::operator= (const Constraint& cons)
 
 bool Constraint::operator< (const Constraint& cons) const
 {
-   if( (int)this->getType() < (int) cons.getType() )
+   if( (int)this->type() < (int) cons.type() )
       return true;
-   else if( (int)this->getType() > (int) cons.getType() )
+   else if( (int)this->type() > (int) cons.type() )
       return false;
 
 	/*
@@ -58,16 +59,15 @@ void Constraint::reset()
 	*/
 }
 
-std::string Constraint::toString()
+std::string Constraint::ToString()
 {
-	std::string consName;
-   char auxStr[100];
+    std::stringstream ss;
 
    	/*
 	ToDo:
 	*/
 
-	return consName;
+	return ss.str();
 }
 
 size_t ConstraintHasher::operator() (const Constraint& cons) const

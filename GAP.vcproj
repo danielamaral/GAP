@@ -41,6 +41,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
+				AdditionalIncludeDirectories="&quot;C:\Documents and Settings\daniel\My Documents\GAP\Codigo\OPT_LP\source&quot;;&quot;C:\Documents and Settings\daniel\My Documents\GAP\Codigo\OPT_LP\include&quot;"
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -176,7 +177,7 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
-				RelativePath=".\Constraint.cpp"
+				RelativePath=".\ConstraintFormulacaoPadrao.cpp"
 				>
 			</File>
 			<File
@@ -192,14 +193,6 @@
 				>
 			</File>
 			<File
-				RelativePath=".\ProblemSolution.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\Solver.cpp"
-				>
-			</File>
-			<File
 				RelativePath=".\SolverFormulacaoPadrao.cpp"
 				>
 			</File>
@@ -208,7 +201,7 @@
 				>
 			</File>
 			<File
-				RelativePath=".\Variable.cpp"
+				RelativePath=".\VariableFormulacaoPadrao.cpp"
 				>
 			</File>
 		</Filter>
@@ -218,7 +211,7 @@
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
 			<File
-				RelativePath=".\Constraint.h"
+				RelativePath=".\ConstraintFormulacaoPadrao.h"
 				>
 			</File>
 			<File
@@ -227,14 +220,6 @@
 			</File>
 			<File
 				RelativePath=".\ProblemDataLoader.h"
-				>
-			</File>
-			<File
-				RelativePath=".\ProblemSolution.h"
-				>
-			</File>
-			<File
-				RelativePath=".\Solver.h"
 				>
 			</File>
 			<File
@@ -250,7 +235,7 @@
 				>
 			</File>
 			<File
-				RelativePath=".\Variable.h"
+				RelativePath=".\VariableFormulacaoPadrao.h"
 				>
 			</File>
 		</Filter>
@@ -259,6 +244,50 @@
 			Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav"
 			UniqueIdentifier="{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}"
 			>
+		</Filter>
+		<Filter
+			Name="Base Classes"
+			>
+			<Filter
+				Name="Header"
+				>
+				<File
+					RelativePath=".\Constraint.h"
+					>
+				</File>
+				<File
+					RelativePath=".\ProblemSolution.h"
+					>
+				</File>
+				<File
+					RelativePath=".\Solver.h"
+					>
+				</File>
+				<File
+					RelativePath=".\Variable.h"
+					>
+				</File>
+			</Filter>
+			<Filter
+				Name="Source"
+				>
+				<File
+					RelativePath=".\Constraint.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\ProblemSolution.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\Solver.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\Variable.cpp"
+					>
+				</File>
+			</Filter>
 		</Filter>
 		<File
 			RelativePath=".\ReadMe.txt"
