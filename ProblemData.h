@@ -1,4 +1,5 @@
-#pragma once
+#ifndef PROBLEMDATA_H
+#define PROBLEMDATA_H
 
 class ProblemData
 {
@@ -33,9 +34,13 @@ public:
     int n() const;
     /// Sets the number of tasks
     void set_n(int x);
+
+    int optimal() const;
+    void set_optimal(int o);
 private:
     int m_;
     int n_;
+    int optimal_;
 
     static const int kMaxMachines = 80;
     static const int kMaxTasks = 1600;
@@ -43,3 +48,5 @@ private:
     int consume_[kMaxMachines][kMaxTasks];
     int capacity_[kMaxMachines];
 };
+
+#endif

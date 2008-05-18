@@ -22,6 +22,7 @@
 			IntermediateDirectory="$(ConfigurationName)"
 			ConfigurationType="1"
 			CharacterSet="1"
+			ManagedExtensions="1"
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
@@ -41,14 +42,14 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="&quot;C:\Documents and Settings\daniel\My Documents\GAP\Codigo\OPT_LP\source&quot;;&quot;C:\Documents and Settings\daniel\My Documents\GAP\Codigo\OPT_LP\include&quot;"
-				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE"
-				MinimalRebuild="true"
-				BasicRuntimeChecks="3"
+				AdditionalIncludeDirectories="&quot;C:\Documents and Settings\daniel\My Documents\GAP\Codigo\Random&quot;;C:\ILOG\CPLEX110\include\ilcplex;&quot;C:\Documents and Settings\daniel\My Documents\GAP\Codigo\OPT_LP\source&quot;;&quot;C:\Documents and Settings\daniel\My Documents\GAP\Codigo\OPT_LP\include&quot;"
+				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;OPT_CPLEX_DEF;VERSAOCPLEX10"
+				MinimalRebuild="false"
+				BasicRuntimeChecks="0"
 				RuntimeLibrary="3"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
-				DebugInformationFormat="4"
+				DebugInformationFormat="3"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -61,8 +62,11 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
+				AdditionalDependencies="cplex110.lib Random.lib"
 				LinkIncremental="2"
+				AdditionalLibraryDirectories="&quot;C:\Documents and Settings\daniel\My Documents\GAP\Codigo\Random\Debug&quot;;C:\ILOG\CPLEX110\lib\x86_.net2005_8.0\stat_mda"
 				GenerateDebugInformation="true"
+				AssemblyDebug="1"
 				SubSystem="1"
 				StackReserveSize="10485760"
 				TargetMachine="1"
@@ -95,6 +99,7 @@
 			IntermediateDirectory="$(ConfigurationName)"
 			ConfigurationType="1"
 			CharacterSet="1"
+			ManagedExtensions="1"
 			WholeProgramOptimization="1"
 			>
 			<Tool
@@ -116,7 +121,8 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
+				AdditionalIncludeDirectories="C:\Users\Daniel\Documents\GAP\Codigo\Random;C:\ILOG\CPLEX110\include\ilcplex;C:\Users\Daniel\Documents\GAP\Codigo\OPT_LP\source;C:\Users\Daniel\Documents\GAP\Codigo\OPT_LP\include"
+				PreprocessorDefinitions="WIN32;_CONSOLE;OPT_CPLEX_DEF;VERSAOCPLEX10"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
 				UsePrecompiledHeader="0"
@@ -134,7 +140,9 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
+				AdditionalDependencies="cplex110.lib Random.lib"
 				LinkIncremental="1"
+				AdditionalLibraryDirectories="C:\Users\Daniel\Documents\GAP\Codigo\Random\Release;C:\ILOG\CPLEX110\lib\x86_.net2005_8.0\stat_mda;C:\ILOG\CPLEX101\lib\x86_.net2005_8.0\stat_mda"
 				GenerateDebugInformation="true"
 				SubSystem="1"
 				HeapReserveSize="0"
@@ -172,40 +180,6 @@
 	</References>
 	<Files>
 		<Filter
-			Name="Source Files"
-			Filter="cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx"
-			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
-			>
-			<File
-				RelativePath=".\ConstraintFormulacaoPadrao.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\GAP.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\ProblemData.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\ProblemDataLoader.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\SolverFormulacaoPadrao.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\stdafx.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\VariableFormulacaoPadrao.cpp"
-				>
-			</File>
-		</Filter>
-		<Filter
 			Name="Header Files"
 			Filter="h;hpp;hxx;hm;inl;inc;xsd"
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
@@ -215,11 +189,19 @@
 				>
 			</File>
 			<File
+				RelativePath=".\Globals.h"
+				>
+			</File>
+			<File
 				RelativePath=".\ProblemData.h"
 				>
 			</File>
 			<File
 				RelativePath=".\ProblemDataLoader.h"
+				>
+			</File>
+			<File
+				RelativePath=".\ProblemSolution.h"
 				>
 			</File>
 			<File
@@ -256,10 +238,6 @@
 					>
 				</File>
 				<File
-					RelativePath=".\ProblemSolution.h"
-					>
-				</File>
-				<File
 					RelativePath=".\Solver.h"
 					>
 				</File>
@@ -276,10 +254,6 @@
 					>
 				</File>
 				<File
-					RelativePath=".\ProblemSolution.cpp"
-					>
-				</File>
-				<File
 					RelativePath=".\Solver.cpp"
 					>
 				</File>
@@ -288,6 +262,104 @@
 					>
 				</File>
 			</Filter>
+		</Filter>
+		<Filter
+			Name="OPT_LP"
+			>
+			<File
+				RelativePath="..\..\OPT_LP\source\opt_col.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\OPT_LP\include\opt_col.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\OPT_LP\source\opt_cplex.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\OPT_LP\include\opt_cplex.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\OPT_LP\source\opt_lp.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\OPT_LP\include\opt_lp.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\OPT_LP\source\opt_row.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\OPT_LP\include\opt_row.h"
+				>
+			</File>
+		</Filter>
+		<Filter
+			Name="Algorithms"
+			>
+			<File
+				RelativePath=".\ConstructiveHeuristics.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\ConstructiveHeuristics.h"
+				>
+			</File>
+			<File
+				RelativePath=".\LocalSearch.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\LocalSearch.h"
+				>
+			</File>
+		</Filter>
+		<Filter
+			Name="Source Files"
+			Filter="cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx"
+			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
+			>
+			<File
+				RelativePath=".\ConstraintFormulacaoPadrao.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\GAP.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\Globals.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\ProblemData.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\ProblemDataLoader.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\ProblemSolution.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\SolverFormulacaoPadrao.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\stdafx.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\VariableFormulacaoPadrao.cpp"
+				>
+			</File>
 		</Filter>
 		<File
 			RelativePath=".\ReadMe.txt"

@@ -4,7 +4,7 @@
 #include <fstream>
 #include "ProblemData.h"
 
-ProblemDataLoader::ProblemDataLoader(const char* filename, ProblemData* pdt) : file(filename), pd(pdt)
+ProblemDataLoader::ProblemDataLoader(const char* filename, int optimal, ProblemData* pdt) : file(filename), pd(pdt), opt(optimal)
 {
 }
 
@@ -20,6 +20,7 @@ void ProblemDataLoader::load() {
     f >> M >> N;
     pd->set_m(M);
     pd->set_n(N);
+    pd->set_optimal(opt);
 
     int cost;
     for (int machine = 0; machine < pd->m(); ++machine) {
@@ -33,7 +34,7 @@ void ProblemDataLoader::load() {
     for (int machine = 0; machine < pd->m(); ++machine) {
         for (int task = 0; task < pd->n(); ++task) {
             f >> consume;
-            pd->set_cost(machine, task, consume);
+            pd->set_consume(machine, task, consume);
         }
     }
 

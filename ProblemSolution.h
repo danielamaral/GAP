@@ -1,6 +1,9 @@
 #pragma once
 
 #include <iostream>
+#include <vector>
+
+class ProblemData;
 
 //Stores output data
 class ProblemSolution
@@ -8,7 +11,7 @@ class ProblemSolution
 	friend std::ostream& operator << (std::ostream& out, ProblemSolution& solution );
 public:
    //Constructor
-   ProblemSolution();
+   ProblemSolution(const ProblemData* pd);
 
    //Destructor
    ~ProblemSolution() {}
@@ -21,6 +24,8 @@ public:
    ToDo:
    All set methods of the private attributes should be defined here
    */
+   /// Set to which machine 'task' is assigned in the solution
+   void set_assignment(int task, int machine);
 
    //==================================================
    // GET METHODS 
@@ -30,14 +35,34 @@ public:
    ToDo:
    All get methods of the private attributes should be defined here
    */
+   /// Returns the number of tasks
+   int n() const;
+   /// Returns the number of machines
+   int m() const;
+   /// To which machine was 'task' assigned in the solution?
+   int assignment(int task) const;
+   /// How much of the machine's capacity is being used
+   int used(int machine) const;
+   /// The final cost of the solution
+   int cost() const;
+   /// Clears the solution to its unassigned state
+   void Reset();
+   /// The number of different assignments between 2 solutions
+   int Distance(const ProblemSolution& sol) const;
+   /// Is this a valid assignment?
+   bool IsValid() const;
 
+   bool operator==(const ProblemSolution& sol);
 private:
 
 	/**
 	ToDo:
 	All objects that define the problem output should be declared here
 	**/
-
+    std::vector<int> assignment_;
+    std::vector<int> used_;
+    int cost_;
+    const ProblemData* pd_;
 };
 
 std::ostream& operator << (std::ostream& out, ProblemSolution& solution );

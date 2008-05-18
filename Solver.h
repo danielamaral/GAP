@@ -22,13 +22,13 @@ public:
    * Solves the problem.
    * @return The solution status.
    */
-   virtual int solve() = 0;
+   virtual int Solve() = 0;
 
    /**
    * Processes the variable values and populates the output class.
    * @param ps A reference to the class to be populated.
    */
-	virtual void generate_solution(ProblemSolution *ps) {}
+	virtual void GenerateSolution(ProblemSolution *ps) {}
 
 protected:
    /** A reference to the problem's input data. */

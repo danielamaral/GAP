@@ -16,12 +16,12 @@ void ProblemData::clear() {
 }
 
 void ProblemData::set_m(int x) {
-    assert(x < kMaxMachines);
+    assert(x <= kMaxMachines);
     m_ = x;
 }
 
 void ProblemData::set_n(int x) {
-    assert(x < kMaxTasks);
+    assert(x <= kMaxTasks);
     n_ = x;
 }
 
@@ -68,4 +68,11 @@ void ProblemData::set_capacity(int machine, int c) {
 int ProblemData::capacity(int machine) const {
     assert(machine < m_);
     return capacity_[machine];
+}
+
+int ProblemData::optimal() const {
+    return optimal_;
+}
+void ProblemData::set_optimal(int o) {
+    optimal_ = o;
 }
