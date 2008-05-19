@@ -70,6 +70,11 @@ int main(int argc, char* argv[])
 		LocalSearch::VNSBra(60 * 60 * 1000, 120 * 1000, 5, &final_sol);
 		sw->Stop();
 		cout << final_sol.cost() << " " << static_cast<double>(sw->ElapsedMilliseconds) / 1000.0 << endl;
+	} else if (algorithm == "Memetic") {
+		sw->Start();
+		LocalSearch::MIPMemetic(&final_sol);
+		sw->Stop();
+		cout << final_sol.cost() << " " << static_cast<double>(sw->ElapsedMilliseconds) / 1000.0 << endl;
 	}
 	return 0;
 }
