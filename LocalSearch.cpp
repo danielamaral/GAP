@@ -224,10 +224,10 @@ uint64 LocalSearch::VNSIntensification(SolverFormulacaoPadrao *solver_intensific
         elapsed_time += sw->ElapsedMilliseconds;
         sw->Reset();
 
-        cout << "VND search - RHS = " << rhs << ", TL = " << TL / 1000 << "s, UB = " << UB << ", status = " << status << endl;
+        //cout << "VND search - RHS = " << rhs << ", TL = " << TL / 1000 << "s, UB = " << UB << ", status = " << status << endl;
         switch(status) {
             case OPTSTAT_MIPOPTIMAL:
-                cout << "VND search - optimal, reverting constraint to delta(x, x_cur) >= " << rhs + k_step << endl;
+                //cout << "VND search - optimal, reverting constraint to delta(x, x_cur) >= " << rhs + k_step << endl;
                 // x_cur = x_next, f_cur = f_next;
 				solver_intensification->GenerateSolution(x_cur);
 				// reverse last local branching constraint into delta(x, x_cur) >= rhs + 1
@@ -235,7 +235,7 @@ uint64 LocalSearch::VNSIntensification(SolverFormulacaoPadrao *solver_intensific
                 rhs = k_step;
                 break;
             case OPTSTAT_FEASIBLE:
-                cout << "VND search - feasible, reverting constraint to delta(x, x_cur) >= " << k_step << endl;
+                //cout << "VND search - feasible, reverting constraint to delta(x, x_cur) >= " << k_step << endl;
 				//x_cur = x_next, f_cur = f_next;
                 solver_intensification->GenerateSolution(x_cur);
 				// reverse last local branching constraint into delta(x, x_cur) >= k_step
@@ -243,14 +243,14 @@ uint64 LocalSearch::VNSIntensification(SolverFormulacaoPadrao *solver_intensific
                 rhs = k_step;
                 break;
             case OPTSTAT_INFEASIBLE:
-                cout << "VND search - proven infeasible, removing last constraint, new RHS = " << rhs + k_step << endl;
+                //cout << "VND search - proven infeasible, removing last constraint, new RHS = " << rhs + k_step << endl;
 				// remove last local branching constraint;
                 solver_intensification->RemoveConstraint(added_cons.back());
                 added_cons.pop_back();
                 rhs += k_step;
                 break;
             case OPTSTAT_NOINTEGER:
-                cout << "VND search - infeasible, breaking out of the search" << endl;
+                //cout << "VND search - infeasible, breaking out of the search" << endl;
                 cont = false;
                 break;
         }
@@ -297,13 +297,36 @@ uint64 LocalSearch::GenerateInitialSolution(SolverFormulacaoPadrao* solver, int 
 	return elapsed_time;
 }
 
+void LocalSearch::RandomizeSolution(ProblemSolution* sol, int exchanges) {
+	for (int i = 0; i < exchanges; ++i) {
+		int task[2];
+		task[0] = Globals::rg()->IRandom(0, Globals::instance()->n() - 1);
+		task[1] = Globals::rg()->IRandom(0, Globals::instance()->n() - 1);
+		sol->Exchange(task[0], task[1]);
+	}
+}
+
+string LocalSearch::PrintPopulation(const vector<ProblemSolution>& pop) {
+	stringstream ss;
+	ss << "[";
+	for (int i = 0; i < static_cast<int>(pop.size()); ++i) {
+		if (i > 0) ss << ", ";
+		ss << pop[i].cost();
+	}
+	ss << "]" << endl;
+	return ss.str();
+}
+
 uint64 LocalSearch::MIPMemetic(ProblemSolution* final_sol) {
 	vector<int> params(Params::NUM_PARAMS);
 	params[TOTAL_TIME] = 1000 * 60 * 60;
 	params[NUM_ITERATIONS] = 10;
-	params[POPULATION_SIZE] = 20;
+	params[POPULATION_SIZE] = 8;
+	params[RANDOMIZE_STEPS] = Globals::instance()->n();
+	params[INITIAL_OPT] = Globals::instance()->m();
 
 	uint64 elapsed_time = 0;
+	Stopwatch^ sw = gcnew Stopwatch();
 
 	// Best solution overall
 	ProblemSolution best_sol(Globals::instance());
@@ -334,6 +357,8 @@ uint64 LocalSearch::MIPMemetic(ProblemSolution* final_sol) {
 	// for every element in the population, generates the first solution
 	elapsed_time += GenerateInitialSolution(&solver_inten, params[TOTAL_TIME]);
 	solver_inten.GenerateSolution(&best_sol);
+	if (best_sol.cost() == Globals::instance()->optimal())
+		goto finalize;
 	for (int i = 0;
 		i < params[POPULATION_SIZE] && elapsed_time < params[TOTAL_TIME];
 		++i) {
@@ -344,7 +369,22 @@ uint64 LocalSearch::MIPMemetic(ProblemSolution* final_sol) {
 			best_sol = pop->at(i);
 		if (best_sol.cost() == Globals::instance()->optimal())
 			goto finalize;
+
+		// Randomizes the solution then does a simple k-opt search
+		RandomizeSolution(&pop->at(i), params[RANDOMIZE_STEPS]);
+		int cons = solver_inten.AddConsMaxAssignmentChanges(pop->at(i), params[INITIAL_OPT]);
+		
+		sw->Start();
+		int status = solver_inten.SolveTLAndUB(inten_params[TOTAL_TIME], 1e9);
+		sw->Stop();
+		elapsed_time += sw->ElapsedMilliseconds;
+		sw->Reset();
+
+		if (status == OPTSTAT_FEASIBLE || status == OPTSTAT_MIPOPTIMAL)
+			solver_inten.GenerateSolution(&pop->at(i));
+		solver_inten.RemoveConstraint(cons);
 	}
+	cout << "Initial solutions [" << elapsed_time << "]: " << PrintPopulation(*pop);
 
 	for (int iter = 0;
 		iter < params[NUM_ITERATIONS] && elapsed_time < params[TOTAL_TIME];
@@ -373,6 +413,7 @@ uint64 LocalSearch::MIPMemetic(ProblemSolution* final_sol) {
 				ellip_params[TOTAL_TIME],
 				&new_pop->at(sol));
 		}
+		cout << "Iteration " << iter << " [" << elapsed_time << "] diver: " << PrintPopulation(*new_pop);
 
 		// intensifies each solution
 		for (int i = 0;
@@ -391,6 +432,7 @@ uint64 LocalSearch::MIPMemetic(ProblemSolution* final_sol) {
 					goto finalize;
 			}
 		}
+		cout << "Iteration " << iter << "[" << elapsed_time << "] iten: " << PrintPopulation(*new_pop);
 
 		// population = new population
 		swap(pop, new_pop);

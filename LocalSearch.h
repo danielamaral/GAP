@@ -3,6 +3,8 @@
 
 #include <deque>
 #include <hash_map>
+#include <vector>
+#include <sstream>
 
 #include "Globals.h"
 
@@ -19,7 +21,9 @@ namespace LocalSearch {
 		TOTAL_TIME,
 		NUM_ITERATIONS,
 		// Memetic params
+		INITIAL_OPT,
 		POPULATION_SIZE,
+		RANDOMIZE_STEPS,
 		NUM_PARAMS
 	};
 
@@ -56,7 +60,9 @@ namespace LocalSearch {
 	void MIPTabuSearch(
 		ProblemSolution* final_sol);
 	// Memetic
+	std::string PrintPopulation(const std::vector<ProblemSolution>& pop);
 	uint64 GenerateInitialSolution(SolverFormulacaoPadrao* solver, int total_time);
+	void RandomizeSolution(ProblemSolution* sol, int exchanges);
 	uint64 MIPMemetic(
 		ProblemSolution* final_sol);
 };

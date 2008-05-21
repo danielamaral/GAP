@@ -80,6 +80,30 @@ bool ProblemSolution::IsValid() const {
     return true;
 }
 
+bool ProblemSolution::IsValidExchange(int task1, int task2) const {
+	if (assignment(task1) == assignment(task2))
+		return true;
+	int mach1 = assignment(task1);
+	int mach2 = assignment(task2);
+	bool machine_one_fits = (pd_->capacity(mach1) >=
+		used(mach1) - pd_->consume(mach1, task1) + pd_->consume(mach1, task2));
+	bool machine_two_fits = (pd_->capacity(mach2) >=
+		used(mach2) - pd_->consume(mach2, task2) + pd_->consume(mach2, task1));
+	return machine_one_fits && machine_two_fits;
+}
+
+void ProblemSolution::Exchange(int task1, int task2) {
+	if (!IsValidExchange(task1, task2))
+		return;
+	int mach1 = assignment(task1);
+	int mach2 = assignment(task2);
+	used_[mach1] = used_[mach1] - pd_->consume(mach1, task1) + pd_->consume(mach1, task2);
+	used_[mach2] = used_[mach2] - pd_->consume(mach2, task2) + pd_->consume(mach2, task1);
+	cost_ = cost_ - pd_->cost(mach1, task1) - pd_->cost(mach2, task2) + pd_->cost(mach1, task2) + pd_->cost(mach2, task1);
+	assignment_[task1] = mach2;
+	assignment_[task2] = mach1;
+}
+
 bool ProblemSolution::operator ==(const ProblemSolution& sol) {
     return assignment_ == sol.assignment_;
 }

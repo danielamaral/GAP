@@ -51,6 +51,9 @@ public:
    int Distance(const ProblemSolution& sol) const;
    /// Is this a valid assignment?
    bool IsValid() const;
+   /// Is this a valid exchange of task assignments?
+   bool IsValidExchange(int task1, int task2) const;
+   void Exchange(int task1, int task2);
 
    bool operator==(const ProblemSolution& sol);
 private:
