@@ -50,7 +50,7 @@ int main(int argc, char* argv[])
 	if (algorithm == "CPLEX") {
 		sw->Start();
 		SolverFormulacaoPadrao solver(Globals::instance());
-		if (solver.Solve(60 * 60 * 1000) == 0) {
+		if (solver.Solve(60 * 60) == 0) {
 			sw->Stop();
 			ProblemSolution sol(Globals::instance());
 			solver.GenerateSolution(&final_sol);
@@ -59,7 +59,7 @@ int main(int argc, char* argv[])
 	} else if (algorithm == "CPLEX-UB") {
 		sw->Start();
 		SolverFormulacaoPadrao solver(Globals::instance());
-		if (solver.SolveTLAndUB(60 * 60 * 1000, upper_bound) == 0) {
+		if (solver.SolveTLAndUB(60 * 60, upper_bound) == 0) {
 			sw->Stop();
 			ProblemSolution sol(Globals::instance());
 			solver.GenerateSolution(&final_sol);

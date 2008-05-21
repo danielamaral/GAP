@@ -205,25 +205,13 @@ int SolverFormulacaoPadrao::UpdateConsMaxAssignmentChangesEllipsoidal(
 }
 
 void SolverFormulacaoPadrao::RemoveConstraint(int cons_row) {
-    /*for (int i = 0; i < problem_data_->n(); ++i)
-        for (int j = 0; j < problem_data_->m(); ++j)
-            SetVariable(cons_row, i, j, 0.0);
-    lp_->chgRHS(cons_row, 0.0);*/
     // TODO(danielrocha) : a better way to do this
     lp_->delRows(cons_row, cons_row);
-    //lp_->chgSense(cons_row, OPT_ROW::LESS);
-    //lp_->chgRHS(cons_row, problem_data_->n() * 2);
 }
 
 void SolverFormulacaoPadrao::RemoveConstraint(int cons_row_begin, int cons_row_end) {
-    /*for (int i = 0; i < problem_data_->n(); ++i)
-        for (int j = 0; j < problem_data_->m(); ++j)
-            SetVariable(cons_row, i, j, 0.0);
-    lp_->chgRHS(cons_row, 0.0);*/
     // TODO(danielrocha) : a better way to do this
     lp_->delRows(cons_row_begin, cons_row_end);
-    //lp_->chgSense(cons_row, OPT_ROW::LESS);
-    //lp_->chgRHS(cons_row, problem_data_->n() * 2);
 }
 
 void SolverFormulacaoPadrao::ReverseConstraint(int cons_row, double rhs) {
