@@ -6,7 +6,6 @@ using namespace System::Diagnostics;
 #include "ProblemSolution.h"
 #include "ConstructiveHeuristics.h"
 #include "ProblemData.h"
-#include "SolverFormulacaoPadrao.h"
 
 void LocalSearch::SimpleOPTSearch(const ProblemSolution& init_sol,
 								  int max_opt,
@@ -15,8 +14,7 @@ void LocalSearch::SimpleOPTSearch(const ProblemSolution& init_sol,
 								  int initial_time,
 								  int ls_time,
 								  ProblemSolution* sol) {
-    const double kInfinity = 1e9;
-	double UB = kInfinity;
+	double UB = Globals::Infinity();
 	// to keep the time
     Stopwatch^ sw = gcnew Stopwatch();
 
@@ -55,10 +53,9 @@ uint64 LocalSearch::EllipsoidalSearch(const ProblemSolution& x1,
 									  const ProblemSolution& x2,
 									  int max_opt,
 									  int k_step,
-									  uint64 step_time,
-									  uint64 total_time,
+									  int step_time,
+									  int total_time,
 									  ProblemSolution* final_sol) {
-	double kInfinity = 1e9;
 
 	// to keep the time
 	uint64 elapsed_time = 0;
@@ -76,7 +73,7 @@ uint64 LocalSearch::EllipsoidalSearch(const ProblemSolution& x1,
 		solver.UpdateConsMaxAssignmentChangesEllipsoidal(x1, x2, opt);
 		
 		sw->Start();
-        int status = solver.SolveTLAndUB(step_time, kInfinity);
+		int status = solver.SolveTLAndUB(step_time, Globals::Infinity());
 		sw->Stop();
 		elapsed_time += sw->ElapsedMilliseconds;
 		sw->Reset();
@@ -118,11 +115,10 @@ void LocalSearch::MultiEllipsoidalSearch() {
 	LocalSearch::EllipsoidalSearch(pool[sol_i], pool[sol_j], 20, 1, 100, 10000, &final_sol);
 }
 
-uint64 LocalSearch::VNSBra(uint64 total_time_limit,
-						   uint64 node_time_limit,
-						   int k_step,
-						   ProblemSolution* final_sol) {
-    const double kInfinity = 1e9;
+void LocalSearch::VNSBra(int total_time_limit,
+						 int node_time_limit,
+						 int k_step,
+						 SolverStatus* status) {
     int iter = 0;
 
     // to keep the time
@@ -136,8 +132,8 @@ uint64 LocalSearch::VNSBra(uint64 total_time_limit,
 	solver_diversification.Init();
 
     int k_cur = k_step;
-    uint64 TL = total_time_limit;
-    double UB = kInfinity;
+    int TL = total_time_limit;
+	double UB = Globals::Infinity();
 
     solver_intensification.SolveTLAndUB(TL, UB, true); // status = MIPSOLVE(TL, UB, first = true, x_opt, f_opt)
     solver_intensification.GenerateSolution(&x_opt);// creates initial solution
@@ -145,12 +141,12 @@ uint64 LocalSearch::VNSBra(uint64 total_time_limit,
     ProblemSolution x_cur = x_opt;
     double f_cur = x_opt.cost();
     while (elapsed_time < total_time_limit) {
-        cout << "Iteration " << ++iter << " - elapsed time: " << elapsed_time / 1000 << "s" << endl;
+        cout << "Iteration " << ++iter << " - elapsed time: " << static_cast<double>(elapsed_time) / 1000.0 << "s" << endl;
 		elapsed_time += VNSIntensification(
 			&solver_intensification,
 			Globals::instance()->n(),
 			1,
-			total_time_limit - elapsed_time,
+			total_time_limit - static_cast<int>(elapsed_time),
 			node_time_limit,
 			&x_cur);
 
@@ -170,8 +166,8 @@ uint64 LocalSearch::VNSBra(uint64 total_time_limit,
         while (cont && elapsed_time < total_time_limit && k_cur + k_step <= Globals::instance()->n()) {
             int last_cons_less = solver_diversification.AddConsMinAssignmentChanges(x_opt, k_cur);  // add constraint k_cur <= delta(x, x_opt)
             int last_cons_greater = solver_diversification.AddConsMaxAssignmentChanges(x_opt, k_cur + k_step);  // add constraint delta(x, x_opt) <= k_cur + k_step
-            TL = total_time_limit - elapsed_time;
-            UB = kInfinity; //UB = x_opt.cost();
+            TL = total_time_limit - static_cast<int>(elapsed_time);
+			UB = Globals::Infinity(); //UB = x_opt.cost();
 
             sw->Start();
             // first = true implies first best strategy, first = false implies best overall strategy
@@ -181,25 +177,29 @@ uint64 LocalSearch::VNSBra(uint64 total_time_limit,
             sw->Reset();
             cout << "Shaking Step - RHS = [" << k_cur << "," << k_cur + k_step << "], TL = " << TL / 1000 << "s, UB = " << UB << ", status = " << status << endl;
 
-            solver_diversification.GenerateSolution(&x_cur);
             solver_diversification.RemoveConstraint(last_cons_less, last_cons_greater);  // remove last two added constraints
             cont = false;
-            if (status == OPTSTAT_OPTIMALINFEAS || status == OPTSTAT_INFEASIBLE) {
+			if (status == OPTSTAT_FEASIBLE || status == OPTSTAT_MIPOPTIMAL) {
+				cont = false;
+				solver_diversification.GenerateSolution(&x_cur);
+				cout << "Shaking Step - stopping, found feasible/optimal solution: " << x_cur.cost();
+			} else {
                 cont = true;
                 k_cur = k_cur + k_step;
                 cout << "Shaking Step - infeasible, continuing with disc size " << k_cur << endl;
-            }
+			}
         }
     }
-	*final_sol = x_opt;
-	return elapsed_time;
+	status->final_sol = x_opt;
+	status->str_status = "heuristic";
+	status->time = elapsed_time / 1000.0;
 }
 
 uint64 LocalSearch::VNSIntensification(SolverFormulacaoPadrao *solver_intensification,
 									   int max_opt,
 									   int k_step,
-									   uint64 total_time_limit,
-									   uint64 node_time_limit,
+									   int total_time_limit,
+									   int node_time_limit,
 									   ProblemSolution* x_cur) {
     // to keep the time
 	uint64 elapsed_time = 0;
@@ -211,7 +211,7 @@ uint64 LocalSearch::VNSIntensification(SolverFormulacaoPadrao *solver_intensific
     bool cont = true;
     int rhs = k_step;
     while (cont && elapsed_time < total_time_limit && rhs < max_opt) {
-        uint64 TL = min(node_time_limit, total_time_limit - elapsed_time);
+        int TL = min(node_time_limit, total_time_limit - static_cast<int>(elapsed_time));
         added_cons.push_back(solver_intensification->AddConsMaxAssignmentChanges(*x_cur, rhs));  // add local branching constraint delta(x, x_cur) <= rhs
         double UB = x_cur->cost();  // UB = f_cur;
 
@@ -279,13 +279,14 @@ void LocalSearch::MIPTabuSearch(ProblemSolution* final_sol) {
 	//   6. Add the differences between the curr_sol and new_sol to the TabuList
 }
 
-uint64 LocalSearch::MIPMemetic(ProblemSolution* final_sol) {
+void LocalSearch::MIPMemetic(SolverStatus *final_status) {
 	vector<int> params(Params::NUM_PARAMS);
 	params[TOTAL_TIME] = 1000 * 60 * 60;
 	params[NUM_ITERATIONS] = 10;
 	params[POPULATION_SIZE] = 20;
 
 	uint64 elapsed_time = 0;
+	Stopwatch^ sw = gcnew Stopwatch();
 
 	// Best solution overall
 	ProblemSolution best_sol(Globals::instance());
@@ -317,7 +318,13 @@ uint64 LocalSearch::MIPMemetic(ProblemSolution* final_sol) {
 	int init_sol_time = 1, status = -1;
 	do {
 		solver_inten.Init();
-		status = solver_inten.SolveTLAndUB(init_sol_time, 1e9, true);
+
+		sw->Start();
+		status = solver_inten.SolveTLAndUB(init_sol_time, Globals::Infinity(), true);
+        sw->Stop();
+        elapsed_time += sw->ElapsedMilliseconds;
+        sw->Reset();
+
 		init_sol_time *= 2;
 	}  while (status != OPTSTAT_FEASIBLE && status != OPTSTAT_MIPOPTIMAL);
 	solver_inten.GenerateSolution(&best_sol);
@@ -328,7 +335,13 @@ uint64 LocalSearch::MIPMemetic(ProblemSolution* final_sol) {
 			cout << "Generating solution #" << i << endl;
 			//ConstructiveHeuristics::RandomStupid(*Globals::instance(), &pop->at(i));
 			solver_inten.Init();
-			status = solver_inten.SolveTLAndUB(10, 1e9);
+
+			sw->Start();
+			status = solver_inten.SolveTLAndUB(10, Globals::Infinity());
+			sw->Stop();
+			elapsed_time += sw->ElapsedMilliseconds;
+			sw->Reset();
+
 		} while (status != OPTSTAT_FEASIBLE && status != OPTSTAT_MIPOPTIMAL);
 		solver_inten.GenerateSolution(&pop->at(i));
 		cout << "Generating solution #" << i << " cost: " << pop->at(i).cost() << endl;
@@ -337,13 +350,6 @@ uint64 LocalSearch::MIPMemetic(ProblemSolution* final_sol) {
 			if (best_sol.cost() == Globals::instance()->optimal())
 				goto finalize;
 		}
-		/*elapsed_time += VNSIntensification(
-			&solver_inten,
-			inten_params[MAX_OPT],
-			inten_params[STEP_OPT],
-			inten_params[TOTAL_TIME],
-			inten_params[STEP_TIME],
-			&pop->at(i));*/
 	}
 
 	for (int iter = 0;
@@ -393,6 +399,7 @@ uint64 LocalSearch::MIPMemetic(ProblemSolution* final_sol) {
 	}
 
 finalize:
-	*final_sol = best_sol;
-	return elapsed_time;
+	final_status->final_sol = best_sol;
+	final_status->str_status = "heuristic";
+	final_status->time = elapsed_time / 1000.0;
 }

@@ -7,9 +7,9 @@
 #include <sstream>
 
 #include "Globals.h"
+#include "SolverFormulacaoPadrao.h"
 
 class ProblemSolution;
-class SolverFormulacaoPadrao;
 
 namespace LocalSearch {
 	enum Params {
@@ -39,8 +39,8 @@ namespace LocalSearch {
 		const ProblemSolution& x2,
 		int max_opt,
 		int k_step,
-		uint64 step_time,
-		uint64 total_time,
+		int step_time,
+		int total_time,
 		ProblemSolution* final_sol);
 	void MultiEllipsoidalSearch();
 	// VNS, returns the total elapsed time in the method
@@ -48,23 +48,23 @@ namespace LocalSearch {
 		SolverFormulacaoPadrao *solver_intensification,
 		int max_opt,
 		int k_step,
-		uint64 total_time_limit,
-		uint64 node_time_limit,
+		int total_time_limit,
+		int node_time_limit,
 		ProblemSolution* x_cur);
-    uint64 VNSBra(
-		uint64 total_time_limit,
-		uint64 node_time_limit,
+    void VNSBra(
+		int total_time_limit,
+		int node_time_limit,
 		int k_step,
-		ProblemSolution* sol);
+		SolverStatus* status);
 	// Tabu
 	void MIPTabuSearch(
-		ProblemSolution* final_sol);
+		ProblemSolution* sol);
 	// Memetic
 	std::string PrintPopulation(const std::vector<ProblemSolution>& pop);
 	uint64 GenerateInitialSolution(SolverFormulacaoPadrao* solver, int total_time);
 	void RandomizeSolution(ProblemSolution* sol, int exchanges);
-	uint64 MIPMemetic(
-		ProblemSolution* final_sol);
+	void MIPMemetic(
+		SolverStatus* final_status);
 };
 
 #endif

@@ -5,8 +5,6 @@
 
 #include "opt_cplex.h"
 #include "ProblemData.h"
-#include "ProblemSolution.h"
-
 
 SolverFormulacaoPadrao::SolverFormulacaoPadrao(ProblemData* problem_data) : Solver(problem_data)
 {
@@ -303,8 +301,9 @@ void SolverFormulacaoPadrao::Init() {
     /** creates the problem */
     lp_->createLP("FormulacaoPadrao", OPTSENSE_MINIMIZE, PROB_MIP);
     lp_->setMIPScreenLog(0);
-    lp_->setMIPEmphasis(4);
+    lp_->setMIPEmphasis(0);
     lp_->setMIPRelTol(0.00);
+	lp_->setMIPAbsTol(0.00);
 
     /** creates the variables */
     CreateVarTaskAssignment();
@@ -314,42 +313,46 @@ void SolverFormulacaoPadrao::Init() {
     CreateConsOneMachinePerTask();
 }
 
-int SolverFormulacaoPadrao::SolveTLAndUB(int time_limit, double upper_bound, bool first) {
-    lp_->setTimeLimit(time_limit);
-    lp_->setMIPCutOff(upper_bound);
-    if (first) {
-        lp_->setNumIntSols(1);
-    } else {
-        lp_->setNumIntSols(0);  // maximum number
-    }
-    //lp_->writeProbLP("SolverFormulacaoPadrao");
-
-    return lp_->optimize(METHOD_MIP);
+void SolverFormulacaoPadrao::SolveTLAndUB(int time_limit, double upper_bound, bool first, SolverStatus* status) {
+	status->status = SolveTLAndUB(time_limit, upper_bound, first);
+	status->gap_absolute = GetGapAbsolute();
+	status->gap_relative = GetGapRelative();
+	if (status->status == OPTSTAT_FEASIBLE || status->status == OPTSTAT_MIPOPTIMAL)
+		GenerateSolution(&status->final_sol);
 }
 
-int SolverFormulacaoPadrao::Solve(int time_limit, int polish_time) {
+int SolverFormulacaoPadrao::SolveTLAndUB(int time_limit, double upper_bound, bool first) {
 	/** sets lp parameters */
     lp_->writeProbLP("SolverFormulacaoPadrao");
     lp_->setTimeLimit(time_limit);
+	//lp_->setVarSel(3);
+
+	lp_->setTimeLimit(time_limit);
+
+	if (upper_bound < Globals::Infinity())
+		lp_->setMIPCutOff(upper_bound);
+
+    if (first)
+        lp_->setNumIntSols(1);
+    else
+        lp_->setNumIntSols(0);  // maximum number
 
     /** solves the problem */
-	int status = lp_->optimize(METHOD_MIP);
+	return lp_->optimize(METHOD_MIP);
+}
 
-    char statusStr[100];
-    lp_->getStatStr(status, statusStr);
+double SolverFormulacaoPadrao::GetGapRelative() {
+	return lp_->getMIPRelGap();
+}
 
-    log << " " << std::endl;
-    log << "Solution => status = " << statusStr << std::endl;
+double SolverFormulacaoPadrao::GetGapAbsolute() {
+	return lp_->getMIPAbsGap();
+}
 
-    if(status == OPTSTAT_MIPOPTIMAL || status == OPTSTAT_FEASIBLE) {
-        log << "           value  = " << lp_->getObjVal() << std::endl;
-        log << "           gap    = " << lp_->getMIPGap() * 100.0 << std::endl;
-        //ProblemSolution sol(problem_data_);
-        //GenerateSolution(&sol);
-        //log << "Final solution:" << std::endl;
-        //log << sol << std::endl;
-        return 0;
-    } else {
-        return 1;
-    }
+int SolverFormulacaoPadrao::Solve(int time_limit) {
+	return SolveTLAndUB(time_limit, Globals::Infinity());
+}
+
+void SolverFormulacaoPadrao::Solve(int time_limit, SolverStatus* status) {
+	SolveTLAndUB(time_limit, Globals::Infinity(), false, status);
 }

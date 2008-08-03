@@ -1,19 +1,52 @@
 #pragma once
 
 #include <fstream>
+#include <sstream>
 #include "solver.h"
 #include "opt_lp.h"
-#include "VariableFormulacaoPadrao.h"
 #include "ConstraintFormulacaoPadrao.h"
+#include "Globals.h"
+#include "ProblemSolution.h"
+#include "VariableFormulacaoPadrao.h"
+
+class SolverStatus {
+public:
+	SolverStatus() : status(-1), final_sol(Globals::instance()),
+		gap_relative(0.0), gap_absolute(0.0), time (0.0) { }
+
+	string ToString() {
+		stringstream ss;
+		ss << final_sol.cost() << " ";
+		if (str_status != "heuristic")
+			ss << gap_relative << " " << gap_absolute << " ";
+		ss << time << " " << str_status;
+		return ss.str();
+	}
+	int status;
+	string str_status;
+
+	ProblemSolution final_sol;
+	
+	double gap_relative;
+	double gap_absolute;
+
+	double time;
+};
 
 class SolverFormulacaoPadrao : public Solver {
 public:
     SolverFormulacaoPadrao(ProblemData* problem_data);
     ~SolverFormulacaoPadrao();
     /// Solves the problem
-    int Solve() { return Solve(30, 0); }
-    int Solve(int time_limit, int polish_time = 0);
+    int Solve() { return Solve(60); }
+    int Solve(int time_limit);
+	void Solve(int time_limit, SolverStatus* status);
+	
 	int SolveTLAndUB(int time_limit, double upper_bound, bool first = false);
+	void SolveTLAndUB(int time_limit, double upper_bound, bool first, SolverStatus* status);
+
+	double GetGapRelative();
+	double GetGapAbsolute();
     /// Initializes the problem (creates variables and constraints)
     void Init();
     /// Generates a ProblemSolution from the X vector

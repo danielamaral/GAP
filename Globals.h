@@ -18,6 +18,8 @@ public:
         }
         return rg_;
     }
+	static double Infinity() { return kInfinity_; };
+
 private:
     Globals();
     Globals(const Globals&);
@@ -25,6 +27,7 @@ private:
 
     static CRandomMersenne* rg_;
     static ProblemData* instance_;
+	static double kInfinity_;
 };
 
 #endif
