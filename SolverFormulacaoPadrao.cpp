@@ -6,152 +6,161 @@
 #include "opt_cplex.h"
 #include "ProblemData.h"
 
-SolverFormulacaoPadrao::SolverFormulacaoPadrao(ProblemData* problem_data) : Solver(problem_data)
-{
+SolverFormulacaoPadrao::SolverFormulacaoPadrao(ProblemData* problem_data) :
+  Solver(problem_data) {
     lp_ = new OPT_CPLEX;
-    log.open((wchar_t*)"log", std::ofstream::out);
+    log_.open((wchar_t*)"log", std::ofstream::out);
 }
 
-SolverFormulacaoPadrao::~SolverFormulacaoPadrao()
-{
+SolverFormulacaoPadrao::~SolverFormulacaoPadrao() {
     if (lp_ != NULL)
         delete lp_;
-    log.close();
+    log_.close();
 }
 
-int SolverFormulacaoPadrao::CreateVarTaskAssignment() {
-    int num_var = 0;
-    VariableFormulacaoPadrao var;
+/* static */ int SolverFormulacaoPadrao::CreateVarTaskAssignment(
+  const ProblemData& problem,
+  const OPT_COL::VARTYPE variable_type,
+  VariableFormulacaoPadraoHash* vHash,
+  OPT_LP* lp) {
+  int num_var = 0;
+  VariableFormulacaoPadrao var;
 
-    // for every machine
-    for (int i = 0; i < problem_data_->m(); ++i) {
-        // for every task
-        for (int j = 0; j < problem_data_->n(); ++j) {
-            var.reset();
-            var.set_type(VariableFormulacaoPadrao::X_ij);
-            var.set_machine(i);
-            var.set_task(j);
-            if (vHash.find(var) == vHash.end()) {
-                // finds the cost
-                double coef = problem_data_->cost(i, j);
+  // for every machine
+  for (int i = 0; i < problem.num_machines(); ++i) {
+    // for every task
+    for (int j = 0; j < problem.num_tasks(); ++j) {
+      var.reset();
+      var.set_type(VariableFormulacaoPadrao::X_ij);
+      var.set_machine(i);
+      var.set_task(j);
+      if (vHash->find(var) == vHash->end()) {
+        // finds the cost
+        double coef = problem.cost(i, j);
 
-                // inserts the variable
-                int var_index = lp_->getNumCols();
-                vHash.insert(VariableFormulacaoPadraoIntPair(var, var_index));
-                OPT_COL col(OPT_COL::VAR_BINARY, coef, 0.0, 1.0, (char*) var.ToString().c_str());
-                lp_->newCol(col);
-                ++num_var;
-            }
-        }
+        // inserts the variable
+        int var_index = lp->getNumCols();
+        vHash->insert(VariableFormulacaoPadraoIntPair(var, var_index));
+        OPT_COL col(variable_type, coef, 0.0, 1.0, (char*) var.ToString().c_str());
+        lp->newCol(col);
+        ++num_var;
+      }
     }
-    return num_var;
+  }
+  return num_var;
 }
 
-int SolverFormulacaoPadrao::CreateConsMachineCapacity() {
-    int num_cons = 0;
-    // constraint
-    ConstraintFormulacaoPadrao cons;
-    // variable
-    VariableFormulacaoPadrao var;
+/* static */ int SolverFormulacaoPadrao::CreateConsMachineCapacity(
+  const ProblemData& problem,
+  VariableFormulacaoPadraoHash* vHash,
+  ConstraintFormulacaoPadraoHash* cHash,
+  OPT_LP* lp) {
+  int num_cons = 0;
+  // constraint
+  ConstraintFormulacaoPadrao cons;
+  // variable
+  VariableFormulacaoPadrao var;
 
-    for (int i = 0; i < problem_data_->m(); ++i) {
-        double rhs = problem_data_->capacity(i);
-        // creates the constraint
-        cons.reset();
-        cons.set_type(ConstraintFormulacaoPadrao::C_MACHINE_CAPACITY);
-        cons.set_machine(i);
+  for (int i = 0; i < problem.num_machines(); ++i) {
+    double rhs = problem.capacity(i);
+    // creates the constraint
+    cons.reset();
+    cons.set_type(ConstraintFormulacaoPadrao::C_MACHINE_CAPACITY);
+    cons.set_machine(i);
 
-        // skips constraints already inserted
-        if (cHash.find(cons) != cHash.end()) {
-            continue;
-        }
-
-        cHash[cons] = lp_->getNumRows();
-        int nnz = problem_data_->n();
-        OPT_ROW row(nnz, OPT_ROW::LESS, rhs, (char*) cons.ToString().c_str());
-
-        // adds each variable
-        for (int j = 0; j < problem_data_->n(); ++j) {
-            var.reset();
-            var.set_type(VariableFormulacaoPadrao::X_ij);
-            var.set_machine(i);
-            var.set_task(j);
-            VariableFormulacaoPadraoHash::iterator vit = vHash.find(var);
-            if (vit == vHash.end()) {
-                assert(false);
-            } else {
-                double consumes = problem_data_->consume(i, j);
-                row.insert(vit->second, consumes);
-                log << " + " << consumes << " " << vit->first.ToString();
-            }
-        }
-
-        log << " <= " << rhs;
-        lp_->addRow(row);
-        ++num_cons;
+    // skips constraints already inserted
+    if (cHash->find(cons) != cHash->end()) {
+      continue;
     }
 
-    return num_cons;
-}
+    (*cHash)[cons] = lp->getNumRows();
+    int nnz = problem.num_tasks();
+    OPT_ROW row(nnz, OPT_ROW::LESS, rhs, (char*) cons.ToString().c_str());
 
-int SolverFormulacaoPadrao::CreateConsOneMachinePerTask() {
-    int num_cons = 0;
-    // constraint
-    ConstraintFormulacaoPadrao cons;
-    // variable
-    VariableFormulacaoPadrao var;
+    // adds each variable
+    for (int j = 0; j < problem.num_tasks(); ++j) {
+      var.reset();
+      var.set_type(VariableFormulacaoPadrao::X_ij);
+      var.set_machine(i);
+      var.set_task(j);
+      VariableFormulacaoPadraoHash::iterator vit = vHash->find(var);
 
-    for (int j = 0; j < problem_data_->n(); ++j) {
-        double rhs = 1.0;
-        // creates the constraint
-        cons.reset();
-        cons.set_type(ConstraintFormulacaoPadrao::C_ONE_MACHINE_PER_TASK);
-        cons.set_task(j);
+      assert(vit != vHash->end());
 
-        // skips constraints already inserted
-        if (cHash.find(cons) != cHash.end()) {
-            continue;
-        }
-
-        cHash[cons] = lp_->getNumRows();
-        int nnz = problem_data_->m();
-        OPT_ROW row(nnz, OPT_ROW::EQUAL, rhs, (char*) cons.ToString().c_str());
-
-        // adds each variable
-        for (int i = 0; i < problem_data_->m(); ++i) {
-            var.reset();
-            var.set_type(VariableFormulacaoPadrao::X_ij);
-            var.set_machine(i);
-            var.set_task(j);
-            VariableFormulacaoPadraoHash::iterator vit = vHash.find(var);
-            assert(vit != vHash.end());
-            log << "+ 1 " << vit->first.ToString();
-            row.insert(vit->second, 1.0);
-        }
-        log << " = 1.0" << std::endl;
-        lp_->addRow(row);
-        ++num_cons;
+      double consumes = problem.consume(i, j);
+      row.insert(vit->second, consumes);
     }
-    return num_cons;
+
+    lp->addRow(row);
+    ++num_cons;
+  }
+
+  return num_cons;
 }
+
+/* static */ int SolverFormulacaoPadrao::CreateConsOneMachinePerTask(
+  const ProblemData& problem,
+  VariableFormulacaoPadraoHash* vHash,
+  ConstraintFormulacaoPadraoHash* cHash,
+  OPT_LP* lp) {
+  int num_cons = 0;
+  // constraint
+  ConstraintFormulacaoPadrao cons;
+  // variable
+  VariableFormulacaoPadrao var;
+
+  for (int j = 0; j < problem.num_tasks(); ++j) {
+    double rhs = 1.0;
+    // creates the constraint
+    cons.reset();
+    cons.set_type(ConstraintFormulacaoPadrao::C_ONE_MACHINE_PER_TASK);
+    cons.set_task(j);
+
+    // skips constraints already inserted
+    if (cHash->find(cons) != cHash->end()) {
+      continue;
+    }
+
+    (*cHash)[cons] = lp->getNumRows();
+    int nnz = problem.num_machines();
+    OPT_ROW row(nnz, OPT_ROW::EQUAL, rhs, (char*) cons.ToString().c_str());
+
+    // adds each variable
+    for (int i = 0; i < problem.num_machines(); ++i) {
+      var.reset();
+      var.set_type(VariableFormulacaoPadrao::X_ij);
+      var.set_machine(i);
+      var.set_task(j);
+      VariableFormulacaoPadraoHash::iterator vit = vHash->find(var);
+
+      assert(vit != vHash->end());
+
+      row.insert(vit->second, 1.0);
+    }
+    lp->addRow(row);
+    ++num_cons;
+  }
+  return num_cons;
+}
+
 
 void SolverFormulacaoPadrao::SetVariable(int cons_row, int task, int machine, double coef) {
-    // variable
-    VariableFormulacaoPadrao var;
+  // variable
+  VariableFormulacaoPadrao var;
 	var.reset();
 	var.set_type(VariableFormulacaoPadrao::X_ij);
 	var.set_task(task);
 	var.set_machine(machine);
-	VariableFormulacaoPadraoHash::iterator vit = vHash.find(var);
-	assert(vit != vHash.end());
+	VariableFormulacaoPadraoHash::iterator vit = vHash_.find(var);
+	assert(vit != vHash_.end());
 	lp_->chgCoef(cons_row, vit->second, coef);
 }
 
 void SolverFormulacaoPadrao::ClearConsMaxAssignmentChangesEllipsoidal() {
-    ConstraintFormulacaoPadrao cons;
-    cons.set_type(ConstraintFormulacaoPadrao::C_MAX_ASSIGNMENT_CHANGES_ELLIPSOIDAL);
-    ConstraintFormulacaoPadraoHash::iterator cit = cHash.find(cons);
-	if (cit != cHash.end()) {
+  ConstraintFormulacaoPadrao cons;
+  cons.set_type(ConstraintFormulacaoPadrao::C_MAX_ASSIGNMENT_CHANGES_ELLIPSOIDAL);
+  ConstraintFormulacaoPadraoHash::iterator cit = cHash_.find(cons);
+	if (cit != cHash_.end()) {
 		int cons_row = cit->second;
         for (int i = 0; i < lp_->getNumCols(); ++i) {
             lp_->chgCoef(cons_row, i, 0.0);
@@ -173,16 +182,16 @@ int SolverFormulacaoPadrao::UpdateConsMaxAssignmentChangesEllipsoidal(
     // creates the constraint
     ConstraintFormulacaoPadrao cons;
     cons.set_type(ConstraintFormulacaoPadrao::C_MAX_ASSIGNMENT_CHANGES_ELLIPSOIDAL);
-    ConstraintFormulacaoPadraoHash::iterator cit = cHash.find(cons);
+    ConstraintFormulacaoPadraoHash::iterator cit = cHash_.find(cons);
     int cons_row;
-    if (cit != cHash.end()) {
+    if (cit != cHash_.end()) {
         // the constraint already exists, zero it
         cons_row = cit->second;
 		ClearConsMaxAssignmentChangesEllipsoidal();
         lp_->chgRHS(cons_row, rhs);
     } else {
         cons_row = lp_->getNumRows();
-        cHash[cons] = lp_->getNumRows();
+        cHash_[cons] = lp_->getNumRows();
         int nnz = problem_data_->n() * 2;
         OPT_ROW row(nnz, OPT_ROW::GREATER, rhs, (char*) cons.ToString().c_str());
         lp_->addRow(row);
@@ -190,13 +199,13 @@ int SolverFormulacaoPadrao::UpdateConsMaxAssignmentChangesEllipsoidal(
 
     // for each task
     for (int i = 0; i < problem_data_->n(); ++i) {
-		// if the task is in the intersection
-		if (x1.assignment(i) == x2.assignment(i)) {
-			SetVariable(cons_row, i, x1.assignment(i), 2.0);
-		} else {  // adds both x1_ij and x2_ij
-			SetVariable(cons_row, i, x1.assignment(i), 1.0);
-			SetVariable(cons_row, i, x2.assignment(i), 1.0);
-		}
+		  // if the task is in the intersection
+		  if (x1.assignment(i) == x2.assignment(i)) {
+			  SetVariable(cons_row, i, x1.assignment(i), 2.0);
+		  } else {  // adds both x1_ij and x2_ij
+			  SetVariable(cons_row, i, x1.assignment(i), 1.0);
+			  SetVariable(cons_row, i, x2.assignment(i), 1.0);
+		  }
     }
 
     return 1;
@@ -231,7 +240,7 @@ int SolverFormulacaoPadrao::AddConsMaxAssignmentChanges(const ProblemSolution& s
 
     // for each task
     for (int i = 0; i < problem_data_->n(); ++i) {
-		SetVariable(cons_row, i, sol.assignment(i), 1.0);
+		  SetVariable(cons_row, i, sol.assignment(i), 1.0);
     }
 
     return cons_row;
@@ -248,7 +257,7 @@ int SolverFormulacaoPadrao::AddConsMinAssignmentChanges(const ProblemSolution& s
 
     // for each task
     for (int i = 0; i < problem_data_->n(); ++i) {
-		SetVariable(cons_row, i, sol.assignment(i), 1.0);
+		  SetVariable(cons_row, i, sol.assignment(i), 1.0);
     }
 
     return cons_row;
@@ -259,7 +268,8 @@ int SolverFormulacaoPadrao::AddConsIntegerSolutionStrongCuttingPlane(const Probl
 	int cons_row = lp_->getNumRows();
 	// All X_ij variables except for the ones already at the basis
 	int nnz = problem_data_->n() * (problem_data_->m() - 1);
-	OPT_ROW row(nnz, OPT_ROW::GREATER, rhs, (char*) "IntegerSolutionStrongCuttingPlane");
+	OPT_ROW row(nnz, OPT_ROW::GREATER, rhs,
+              (char*) "IntegerSolutionStrongCuttingPlane");
 	lp_->addRow(row);
 
 	// for each task
@@ -275,45 +285,60 @@ int SolverFormulacaoPadrao::AddConsIntegerSolutionStrongCuttingPlane(const Probl
 
 	return cons_row;
 }
-void SolverFormulacaoPadrao::GenerateSolution(ProblemSolution* sol) {
-    // Loads the solution into the Variable hash and constructs the ProblemSolution
-    double* x = new double[lp_->getNumCols()];
-    lp_->getX(x);
 
-    //cout << "loading solution!!!" << endl;
-    int cont = 0;
-    for (VariableFormulacaoPadraoHash::iterator vit = vHash.begin(); vit != vHash.end(); ++vit) {
-        // TODO(daniel): fix this ugly workaround
-        VariableFormulacaoPadrao& v = const_cast<VariableFormulacaoPadrao&>(vit->first);
-        v.set_value(x[vit->second]);
-        // assigned variable
-        if (x[vit->second] > 1e-9) {
-            ++cont;
-            //cout << "assigning task " << vit->first.task() << " to machine " << vit->first.machine() << " (" << x[vit->second] << ")" << endl;
-            sol->set_assignment(vit->first.task(), vit->first.machine());
-        }
+void SolverFormulacaoPadrao::GenerateSolution(ProblemSolution* sol) {
+  GenerateSolution(lp_, &vHash_, &cHash_, sol);
+}
+
+/* static */ void SolverFormulacaoPadrao::GenerateSolution(
+  OPT_LP* lp,
+  VariableFormulacaoPadraoHash* vHash,
+  ConstraintFormulacaoPadraoHash* cHash,
+  ProblemSolution* sol) {
+
+  // Loads the solution into the Variable hash and constructs the
+  // ProblemSolution
+  double* x = new double[lp->getNumCols()];
+  lp->getX(x);
+
+  //cout << "loading solution!!!" << endl;
+  int cont = 0;
+  for (VariableFormulacaoPadraoHash::iterator vit = vHash->begin();
+       vit != vHash->end(); ++vit) {
+    // TODO(daniel): fix this ugly workaround
+    VariableFormulacaoPadrao& v =
+      const_cast<VariableFormulacaoPadrao&>(vit->first);
+    v.set_value(x[vit->second]);
+    // assigned variable
+    if (x[vit->second] > Globals::EPS()) {
+      ++cont;
+      //cout << "assigning task " << vit->first.task() << " to machine "
+      //     << vit->first.machine() << " (" << x[vit->second] << ")" << endl;
+      sol->set_assignment(vit->first.task(), vit->first.machine());
     }
-    //cout << "cont = " << cont << endl;
-    assert(sol->IsValid());
+  }
+  //cout << "cont = " << cont << endl;
+  assert(sol->IsValid());
 }
 
 void SolverFormulacaoPadrao::Init() {
-    /** creates the problem */
-    lp_->createLP("FormulacaoPadrao", OPTSENSE_MINIMIZE, PROB_MIP);
-    lp_->setMIPScreenLog(0);
-    lp_->setMIPEmphasis(0);
-    lp_->setMIPRelTol(0.00);
+  /** creates the problem */
+  lp_->createLP("FormulacaoPadrao", OPTSENSE_MINIMIZE, PROB_MIP);
+  lp_->setMIPScreenLog(0);
+  lp_->setMIPEmphasis(0);
+  lp_->setMIPRelTol(0.00);
 	lp_->setMIPAbsTol(0.00);
 
-    /** creates the variables */
-    CreateVarTaskAssignment();
+  /** creates the variables */
+  CreateVarTaskAssignment(*problem_data_, OPT_COL::VAR_BINARY, &vHash_, lp_);
 
-    /** creates the constraints */
-    CreateConsMachineCapacity();
-    CreateConsOneMachinePerTask();
+  /** creates the constraints */
+  CreateConsMachineCapacity(*problem_data_, &vHash_, &cHash_, lp_);
+  CreateConsOneMachinePerTask(*problem_data_, &vHash_, &cHash_, lp_);
 }
 
-void SolverFormulacaoPadrao::SolveTLAndUB(int time_limit, double upper_bound, bool first, SolverStatus* status) {
+void SolverFormulacaoPadrao::SolveTLAndUB(int time_limit, double upper_bound,
+                                          bool first, SolverStatus* status) {
 	status->status = SolveTLAndUB(time_limit, upper_bound, first);
 	status->gap_absolute = GetGapAbsolute();
 	status->gap_relative = GetGapRelative();
@@ -321,10 +346,48 @@ void SolverFormulacaoPadrao::SolveTLAndUB(int time_limit, double upper_bound, bo
 		GenerateSolution(&status->final_sol);
 }
 
+/* static */ void SolverFormulacaoPadrao::GetRelaxedDualValues(
+  const ProblemData& p,
+  vector<double>* dual) {
+  
+  OPT_LP* lp = new OPT_CPLEX;
+  VariableFormulacaoPadraoHash vHash;
+  ConstraintFormulacaoPadraoHash cHash;
+
+  lp->createLP("FormulacaoPadraoLP", OPTSENSE_MINIMIZE, PROB_LP);
+  CreateVarTaskAssignment(p, OPT_COL::VAR_CONTINUOUS, &vHash, lp);
+  CreateConsMachineCapacity(p, &vHash, &cHash, lp);
+  CreateConsOneMachinePerTask(p, &vHash, &cHash, lp);
+
+  lp->optimize(METHOD_DUAL);
+
+  dual->reserve(lp->getNumRows());
+  lp->getPi(static_cast<double*>(&(dual->at(0))));
+}
+
+/* static */ void SolverFormulacaoPadrao::GetFirstIntegerSolution(
+  const ProblemData& p,
+  ProblemSolution* sol) {
+  
+  OPT_LP* lp = new OPT_CPLEX;
+  VariableFormulacaoPadraoHash vHash;
+  ConstraintFormulacaoPadraoHash cHash;
+
+  lp->createLP("FormulacaoPadraoFirstInteger", OPTSENSE_MINIMIZE, PROB_MIP);
+  CreateVarTaskAssignment(p, OPT_COL::VAR_BINARY, &vHash, lp);
+  CreateConsMachineCapacity(p, &vHash, &cHash, lp);
+  CreateConsOneMachinePerTask(p, &vHash, &cHash, lp);
+
+  lp->setNumIntSols(1);
+  lp->optimize(METHOD_MIP);
+
+  GenerateSolution(lp, &vHash, &cHash, sol);
+}
+
 int SolverFormulacaoPadrao::SolveTLAndUB(int time_limit, double upper_bound, bool first) {
 	/** sets lp parameters */
-    lp_->writeProbLP("SolverFormulacaoPadrao");
-    lp_->setTimeLimit(time_limit);
+  lp_->writeProbLP("SolverFormulacaoPadrao");
+  lp_->setTimeLimit(time_limit);
 	//lp_->setVarSel(3);
 
 	lp_->setTimeLimit(time_limit);

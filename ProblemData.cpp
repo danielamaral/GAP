@@ -29,8 +29,16 @@ int ProblemData::m() const {
     return m_;
 }
 
+int ProblemData::num_machines() const {
+    return m();
+}
+
 int ProblemData::n() const {
     return n_;
+}
+
+int ProblemData::num_tasks() const {
+    return n();
 }
 
 void ProblemData::set_cost(int machine, int task, int c) {
@@ -75,4 +83,22 @@ int ProblemData::optimal() const {
 }
 void ProblemData::set_optimal(int o) {
     optimal_ = o;
+}
+
+int ProblemData::AssignmentCost(int machine, vector<int> assignment) {
+  int cost = 0;
+  for (int t = 0; t < this->num_tasks(); ++t) {
+    if (assignment[t] == 1)
+      cost += this->cost(machine, t);
+  }
+  return cost;
+}
+
+int ProblemData::AssignmentConsume(int machine, vector<int> assignment) {
+  int consume = 0;
+  for (int t = 0; t < this->num_tasks(); ++t) {
+    if (assignment[t] == 1)
+      consume += this->consume(machine, t);
+  }
+  return consume;
 }

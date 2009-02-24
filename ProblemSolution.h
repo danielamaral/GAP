@@ -37,16 +37,24 @@ public:
    */
    /// Returns the number of tasks
    int n() const;
+   int num_tasks() const;
    /// Returns the number of machines
    int m() const;
+   int num_machines() const;
    /// To which machine was 'task' assigned in the solution?
    int assignment(int task) const;
    /// How much of the machine's capacity is being used
    int used(int machine) const;
    /// The final cost of the solution
    int cost() const;
+   /// The cost of the current assignment of tasks to machine 'mac'. 
+   int AssignmentCost(int mac) const;
    /// Clears the solution to its unassigned state
-   void Reset();
+   void Clear();
+   /// A boolean vector with the tasks assigned to machine 'mac'
+   void GetMachineAssignments(int mac, vector<bool>* assign) const;
+   /// A boolean vector with the tasks assigned to machine 'mac'
+   void GetMachineAssignments(int mac, vector<int>* tasks) const;
    /// The number of different assignments between 2 solutions
    int Distance(const ProblemSolution& sol) const;
    /// Is this a valid assignment?

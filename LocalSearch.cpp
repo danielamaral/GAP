@@ -257,7 +257,7 @@ uint64 LocalSearch::VNSIntensification(SolverFormulacaoPadrao *solver_intensific
         // stopping condition
         if (rhs >= Globals::instance()->n() ||
 			((status == OPTSTAT_MIPOPTIMAL || status == OPTSTAT_FEASIBLE) && x_cur->cost() == Globals::instance()->optimal())) {
-			break;
+			cont = false;
         }
     }
 	

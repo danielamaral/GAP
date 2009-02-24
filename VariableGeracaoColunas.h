@@ -5,9 +5,9 @@
 #include <hash_map>
 
 //Variables
-class VariableFormulacaoPadrao {
+class VariableGeracaoColunas {
     //Struct used by hash table
-    friend class VariableFormulacaoPadraoHasher;
+    friend class VariableGeracaoColunasHasher;
 
 public:
 
@@ -18,11 +18,11 @@ public:
     };
 
    //Constructors
-   VariableFormulacaoPadrao();
-   VariableFormulacaoPadrao(const VariableFormulacaoPadrao& orig);
+   VariableGeracaoColunas();
+   VariableGeracaoColunas(const VariableGeracaoColunas& orig);
 
    //Destructor
-   virtual ~VariableFormulacaoPadrao();
+   virtual ~VariableGeracaoColunas();
    
     //==================================================
     // GET METHODS 
@@ -81,11 +81,11 @@ public:
    // OPERATORS 
    //==================================================
    //Assignment 
-   VariableFormulacaoPadrao& operator=(const VariableFormulacaoPadrao& var);
+   VariableGeracaoColunas& operator=(const VariableGeracaoColunas& var);
    //Less 
-   bool operator<(const VariableFormulacaoPadrao& var) const;
+   bool operator<(const VariableGeracaoColunas& var) const;
    //Equals 
-   bool operator==(const VariableFormulacaoPadrao& var) const;
+   bool operator==(const VariableGeracaoColunas& var) const;
 
    //Variable name
    std::string ToString() const;
@@ -93,46 +93,46 @@ public:
 private:
 
 	//tipo da variavel
-  VariableType type_;
+    VariableType type_;
 
-  // machine
-  int machine_;
+    // machine
+    int machine_;
 
-  // task
-  int task_;
+    // task
+    int task_;
 
 	double value_;
 	double reducedcost_;
 };
 
 
-class VariableFormulacaoPadraoHasher :
-  public stdext::hash_compare<VariableFormulacaoPadrao> {
+class VariableGeracaoColunasHasher :
+  public stdext::hash_compare<VariableGeracaoColunas> {
 public:
    //Less operator
-   bool operator()(const VariableFormulacaoPadrao& v1,
-                   const VariableFormulacaoPadrao& v2) const;
+   bool operator()(const VariableGeracaoColunas& v1,
+                   const VariableGeracaoColunas& v2) const;
 
    //Hash value
-   size_t operator()(const VariableFormulacaoPadrao& v) const;
+   size_t operator()(const VariableGeracaoColunas& v) const;
 };
 
-class VariableFormulacaoPadraoPtrHasher :
-  public stdext::hash_compare<VariableFormulacaoPadrao*> {
+class VariableGeracaoColunasPtrHasher :
+  public stdext::hash_compare<VariableGeracaoColunas*> {
 public:
    //Less operator
-   bool operator()(const VariableFormulacaoPadrao* v1,
-                   const VariableFormulacaoPadrao* v2) const;
+   bool operator()(const VariableGeracaoColunas* v1,
+                   const VariableGeracaoColunas* v2) const;
 
    //Hash value
-   size_t operator()(const VariableFormulacaoPadrao* v) const;
+   size_t operator()(const VariableGeracaoColunas* v) const;
 };
 
 /**
  * Type definition for the hash object.
  */
 typedef stdext::hash_map<
-  VariableFormulacaoPadrao, int, VariableFormulacaoPadraoHasher>
-VariableFormulacaoPadraoHash;
+  VariableGeracaoColunas, int, VariableGeracaoColunasHasher>
+VariableGeracaoColunasHash;
 
-typedef std::pair<VariableFormulacaoPadrao, int> VariableFormulacaoPadraoIntPair;
+typedef std::pair<VariableGeracaoColunas, int> VariableGeracaoColunasIntPair;

@@ -8,8 +8,8 @@ using namespace std;
 ProblemSolution::ProblemSolution(const ProblemData* pd) : pd_(pd)
 {
 	assignment_.resize(pd->n(), -1);
-    used_.resize(pd->m(), 0);
-	Reset();
+  used_.resize(pd->m(), 0);
+	Clear();
 }
 
 void ProblemSolution::set_assignment(int task, int machine) {
@@ -42,8 +42,16 @@ int ProblemSolution::n() const {
 	return pd_->n();
 }
 
+int ProblemSolution::num_tasks() const {
+	return this->n();
+}
+
 int ProblemSolution::m() const {
 	return pd_->m();
+}
+
+int ProblemSolution::num_machines() const {
+	return this->m();
 }
 
 int ProblemSolution::cost() const {
@@ -58,10 +66,33 @@ int ProblemSolution::Distance(const ProblemSolution& sol) const {
 	return d;
 }
 
-void ProblemSolution::Reset() {
+void ProblemSolution::Clear() {
     fill(assignment_.begin(), assignment_.end(), -1);
     fill(used_.begin(), used_.end(), 0);
     cost_ = 0;
+}
+
+void ProblemSolution::GetMachineAssignments(int mac,
+                                            vector<bool>* assign) const {
+  assign->reserve(this->num_tasks());
+  for (int i = 0; i < this->num_tasks(); ++i)
+    (*assign[i]) = this->assignment(i) == mac;
+}
+
+void ProblemSolution::GetMachineAssignments(int mac,
+                                            vector<int>* tasks) const {
+  tasks->clear();
+  for (int i = 0; i < this->num_tasks(); ++i)
+    if (this->assignment(i) == mac)
+      tasks->push_back(i);
+}
+
+int ProblemSolution::AssignmentCost(int mac) const {
+  int ret = 0;
+  for (int i = 0; i < this->num_tasks(); ++i)
+    if (this->assignment(i) == mac)
+      ret += pd_->cost(mac, i);
+  return ret;
 }
 
 bool ProblemSolution::IsValid() const {

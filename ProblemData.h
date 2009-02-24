@@ -25,13 +25,19 @@ public:
     /// Sets the capacity of 'machine'
     void set_capacity(int machine, int c);
     
+    int AssignmentCost(int machine, vector<int> assignment);
+    int AssignmentConsume(int machine, vector<int> assignment);
+
+
     /// Returns the number of machines (agents, etc)
     int m() const;
+    int num_machines() const;
     /// Sets the number of machines
     void set_m(int x);
 
     /// Returns the number of tasks (jobs, etc)
     int n() const;
+    int num_tasks() const;
     /// Sets the number of tasks
     void set_n(int x);
 

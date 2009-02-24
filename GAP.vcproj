@@ -185,10 +185,6 @@
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
 			<File
-				RelativePath=".\ConstraintFormulacaoPadrao.h"
-				>
-			</File>
-			<File
 				RelativePath=".\Globals.h"
 				>
 			</File>
@@ -205,19 +201,11 @@
 				>
 			</File>
 			<File
-				RelativePath=".\SolverFormulacaoPadrao.h"
-				>
-			</File>
-			<File
 				RelativePath=".\stdafx.h"
 				>
 			</File>
 			<File
 				RelativePath=".\targetver.h"
-				>
-			</File>
-			<File
-				RelativePath=".\VariableFormulacaoPadrao.h"
 				>
 			</File>
 		</Filter>
@@ -325,10 +313,6 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
-				RelativePath=".\ConstraintFormulacaoPadrao.cpp"
-				>
-			</File>
-			<File
 				RelativePath=".\GAP.cpp"
 				>
 			</File>
@@ -349,15 +333,63 @@
 				>
 			</File>
 			<File
+				RelativePath=".\stdafx.cpp"
+				>
+			</File>
+		</Filter>
+		<Filter
+			Name="FormulacaoPadrao"
+			>
+			<File
+				RelativePath=".\ConstraintFormulacaoPadrao.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\ConstraintFormulacaoPadrao.h"
+				>
+			</File>
+			<File
 				RelativePath=".\SolverFormulacaoPadrao.cpp"
 				>
 			</File>
 			<File
-				RelativePath=".\stdafx.cpp"
+				RelativePath=".\SolverFormulacaoPadrao.h"
 				>
 			</File>
 			<File
 				RelativePath=".\VariableFormulacaoPadrao.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\VariableFormulacaoPadrao.h"
+				>
+			</File>
+		</Filter>
+		<Filter
+			Name="GeracaoColunas"
+			>
+			<File
+				RelativePath=".\ConstraintGeracaoColunas.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\ConstraintGeracaoColunas.h"
+				>
+			</File>
+			<File
+				RelativePath=".\SolverGeracaoColunas.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\SolverGeracaoColunas.h"
+				>
+			</File>
+			<File
+				RelativePath=".\VariableGeracaoColunas.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\VariableGeracaoColunas.h"
 				>
 			</File>
 		</Filter>

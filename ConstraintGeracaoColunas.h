@@ -8,10 +8,10 @@ using namespace std;
 /**
  * Class which defines a contraint in the LP.
  */
-class ConstraintFormulacaoPadrao
+class ConstraintGeracaoColunas
 {
    //Struct used by hash table
-   friend class ConstraintFormulacaoPadraoHasher;
+   friend class ConstraintGeracaoColunasHasher;
 
 public:
 
@@ -28,22 +28,22 @@ public:
 	};
 
 	/** Default constructor. */
-	ConstraintFormulacaoPadrao();
+	ConstraintGeracaoColunas();
 
 	/** Copy constructor. */
-	ConstraintFormulacaoPadrao(const ConstraintFormulacaoPadrao& cons);
+	ConstraintGeracaoColunas(const ConstraintGeracaoColunas& cons);
 
 	/** Destructor. */
-	~ConstraintFormulacaoPadrao();
+	~ConstraintGeracaoColunas();
 
 	/** Assign operator. */
-	ConstraintFormulacaoPadrao& operator= (const ConstraintFormulacaoPadrao& cons);
+	ConstraintGeracaoColunas& operator= (const ConstraintGeracaoColunas& cons);
 
 	/** Less operator. */
-	bool operator< (const ConstraintFormulacaoPadrao& cons) const;
+	bool operator< (const ConstraintGeracaoColunas& cons) const;
 
 	/** Equals operator. */
-	bool operator== (const ConstraintFormulacaoPadrao& cons) const;
+	bool operator== (const ConstraintGeracaoColunas& cons) const;
 
 	/**
 	 * Returns a string containing an unique name for the constraint.
@@ -112,15 +112,15 @@ private:
 /**
  * Defines the operations needed by the hash object.
  */
-class ConstraintFormulacaoPadraoHasher :
-  public stdext::hash_compare<ConstraintFormulacaoPadrao> {
+class ConstraintGeracaoColunasHasher :
+  public stdext::hash_compare<ConstraintGeracaoColunas> {
 public:
 	/**
 	 * Applies the hash function on a Constraint object.
 	 * @param cons The constraint.
 	 * @return The hash value for the constraint.
 	 */
-	size_t operator() (const ConstraintFormulacaoPadrao& cons) const;
+	size_t operator() (const ConstraintGeracaoColunas& cons) const;
 
 	/**
 	 * Defines an order rule for two Constraint objects.
@@ -128,13 +128,13 @@ public:
 	 * @param cons2 The second constraint to be compared.
 	 * @return True if const1 comes before cons2, false otherwise.
 	 */
-	bool operator() (const ConstraintFormulacaoPadrao& cons1,
-                   const ConstraintFormulacaoPadrao& cons2) const;
+	bool operator() (const ConstraintGeracaoColunas& cons1,
+                   const ConstraintGeracaoColunas& cons2) const;
 };
 
 /**
  * Type definition for the hash object.
  */
 typedef stdext::hash_map<
-  ConstraintFormulacaoPadrao, int, ConstraintFormulacaoPadraoHasher>
-ConstraintFormulacaoPadraoHash;
+  ConstraintGeracaoColunas, int, ConstraintGeracaoColunasHasher>
+ConstraintGeracaoColunasHash;
