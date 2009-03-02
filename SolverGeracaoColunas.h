@@ -62,19 +62,25 @@ private:
   **             VARIABLE CREATION + STABILIZATION                   **
   *********************************************************************/
 
-	// Sets the variable x_task,machine with a coeficient
-	// 'coef' in constraint cons_row
-	void SetVariable(int cons_row, int task, int machine, double coef);
+  void AddNewColumn(double cost, double lower_bound, double upper_bound,
+                    int machine, int index, const vector<int>& tasks,
+                    VariableGeracaoColunasHash* vHash, OPT_LP* lp);
 
-  void AddIdentityColumns();
-  void AddStabilizationColumns();
-  void AddIntegerSolutionToModel();
+  void AddStabilizationColumns(const ProblemData& p,
+                               const vector<double>& relaxed_dual_values,
+                               VariableGeracaoColunasHash* vHash, OPT_LP* lp);
+
+  void AddIntegerSolutionToModel(const ProblemData& p,
+                                 const vector<double>& relaxed_dual_values,
+                                 VariableGeracaoColunasHash* vHash, OPT_LP* lp);
 
   /********************************************************************
   **                    CONSTRAINT CREATION                          **
   *********************************************************************/
-  void AddSumAssignmentsPerTaskEqualsOneConstraints(*problem_data_, lp);
-  void AddSumAssignmentsPerMachineAtMostOneConstraints(*problem_data_, lp);
+  void AddSumAssignmentsPerTaskEqualsOneConstraints(
+      const ProblemData& pd, ConstraintGeracaoColunasHash* cHash, OPT_LP* lp);
+  void AddSumAssignmentsPerMachineAtMostOneConstraints(
+      const ProblemData& pd, ConstraintGeracaoColunasHash* cHash, OPT_LP* lp);
 
   /********************************************************************
   **                   COLUMN GENERATION METHODS                     **
@@ -89,6 +95,11 @@ private:
                          int* num_columns,
                          vector<vector<short> >* fixed_vars,
                          double best_solution_value);
+
+  void RemoveExcessColumns(const ProblemData& pd,
+                           int num_columns_to_remove,
+                           VariableGeracaoColunasHash* vHash,
+                           OPT_LP* lp);
 
   /********************************************************************
   **                    BRANCH AND BOUND METHODS                     **
@@ -115,19 +126,26 @@ private:
   // o branch and bound. Elas armazenam o estado, fazem as modificações
   // necessárias nas colunas e chamam o BB. Depois que o BB retorna, elas
   // retornam as colunas e a matriz 'fixed_vars' ao seu estado original.
-  void FixVarOnZero(
-    int fixed_machine, int fixed_task, int num_nodes_limit,
-    double lower_bound, const ProblemData& p, double lower_bound, OPT_LP* lp,
-    double* best_solution_value, ProblemSolution* best_solution,
-    vector<vector<short> >* fixed_vars, int* num_columns, int depth,
-    double* pct_tree_solved, int* num_visited_nodes, STATUS_BB* status);
+  enum FixingSense {
+    FIX_ON_ZERO = 0,
+    FIX_ON_ONE
+  };
 
-  void FixVarOnOne(
-    int fixed_machine, int fixed_task, int num_nodes_limit,
-    double lower_bound, const ProblemData& p, double lower_bound, OPT_LP* lp,
-    double* best_solution_value, ProblemSolution* best_solution,
-    vector<vector<short> >* fixed_vars, int* num_columns, int depth,
-    double* pct_tree_solved, int* num_visited_nodes, STATUS_BB* status);
+  void SetAndStoreFixedVariables(
+      FixingSense sense, const ProblemData& p, int fixed_task,
+      vector<vector<short> >* fixed, vector<short> before_fixing);
+
+  bool ShouldRemoveColumnWhenFixing(
+      FixingSense sense, const VariableGeracaoColunas& var,
+      int fixed_machine, int fixed_task);
+
+  void FixVariableAndContinueBB(
+    FixingSense fixing_sense, int fixed_machine, int fixed_task,
+    int num_nodes_limit, double lower_bound, const ProblemData& p,
+    double lower_bound, OPT_LP* lp, double* best_solution_value,
+    ProblemSolution* best_solution, vector<vector<short> >* fixed_vars,
+    int* num_columns, int depth, double* pct_tree_solved,
+    int* num_visited_nodes, STATUS_BB* status);
 
   // Usa uma função heurística para selecionar variáveis candidatas
   // a serem fixadas. Depois pega essas candidatas e submete a um
@@ -148,7 +166,9 @@ private:
   ConstraintGeracaoColunasHash cHash_;
 
   int num_pivo_;
+  int column_count_;
   static int kMaxNumberColumns_ = 40000;
+  static int kNumColumnsToRemove_ = 10000;
   static int kMaxDepthFixingVars_ = 4;
   static int kNumberOfLookupsFixingVars_[kMaxDepthFixingVars_] = { 10, 8, 6, 4 };
 };

@@ -5,6 +5,7 @@
 #include <string>
 
 using namespace std;
+
 /**
  * Class which defines a contraint in the LP.
  */
@@ -19,12 +20,12 @@ public:
 	enum ConstraintType
 	{
 		C_ERROR = 0,
-    C_MACHINE_CAPACITY,
-    C_ONE_MACHINE_PER_TASK,
-    C_MAX_ASSIGNMENT_CHANGES,
+    C_SUM_ALLOCATIONS_PER_MACHINE_AT_MOST_ONE,
+    C_SUM_ALLOCATIONS_PER_TASK_EQUALS_ONE
+    /*C_MAX_ASSIGNMENT_CHANGES,
 		C_MIN_ASSIGNMENT_CHANGES,
 		C_MAX_ASSIGNMENT_CHANGES_ELLIPSOIDAL,
-		C_INTEGER_STRONG_CUTTING_PLANE
+		C_INTEGER_STRONG_CUTTING_PLANE*/
 	};
 
 	/** Default constructor. */
@@ -51,56 +52,56 @@ public:
 	 */
 	std::string ToString() const;
 
-   //==================================================
-   // GET METHODS 
-   //==================================================
-    
-   // type
-	ConstraintType type() const	{
-        return type_;
-    }
+ //==================================================
+ // GET METHODS 
+ //==================================================
+  
+  // type
+  ConstraintType type() const	{
+      return type_;
+  }
 
-	// machine
-	int machine() const {
-        return machine_;
-    }
+  // machine
+  int machine() const {
+      return machine_;
+  }
 
-    // task
-    int task() const {
-        return task_;
-    }
+  // task
+  int task() const {
+      return task_;
+  }
 
-    // dual value
-    double dualvalue() const {
-        return dualvalue_;
-    }
+  // dual value
+  double dualvalue() const {
+      return dualvalue_;
+  }
 
-   //==================================================
-   // SET METHODS 
-   //==================================================
+ //==================================================
+ // SET METHODS 
+ //==================================================
 
-    // reset variables values
-    void reset();
+  // reset variables values
+  void Clear();
 
-    // set constraint type
-    void set_type(ConstraintType t)	{
-      type_ = t;
-    }
+  // set constraint type
+  void set_type(ConstraintType t)	{
+    type_ = t;
+  }
 
-    // set machine
-	  void set_machine(int machine) {
-        machine_ = machine;
-    }
+  // set machine
+  void set_machine(int machine) {
+      machine_ = machine;
+  }
 
-    // set task
-    void set_task(int task) {
-      task_ = task;
-    }
-	
-    // set dual value
-    void set_dualvalue(double dualvalue) {
-      dualvalue_ = dualvalue;
-    }
+  // set task
+  void set_task(int task) {
+    task_ = task;
+  }
+
+  // set dual value
+  void set_dualvalue(double dualvalue) {
+    dualvalue_ = dualvalue;
+  }
   
 private:
 	ConstraintType type_;

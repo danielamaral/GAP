@@ -4,6 +4,37 @@
 #include <map>
 #include <hash_map>
 
+class Column {
+public:
+  void Column(int machine, int index, const vector<int>& tasks) :
+      machine_(machine),
+      index_(index),
+      tasks_(tasks) {
+  }
+
+  void Column(const Column& c) {
+    this->machine_ = c.machine();
+    this->tasks_ = c.tasks();
+    this->index_ = c.index();
+  }
+
+  void Clear() {
+    this->machine_ = -1;
+    this->index = -1;
+    this->tasks_.clear();
+  }
+
+  void set_index(int i) { index_ = i; }
+  int index() { return index_; }
+  int machine() { return machine_; }
+  const vector<int>& tasks() { return tasks_; }
+
+private:
+  vector<int> tasks_;
+  int machine_;
+  int index_;
+};
+
 //Variables
 class VariableGeracaoColunas {
     //Struct used by hash table
@@ -14,7 +45,9 @@ public:
     // All variable types
     enum VariableType {
 	    V_ERROR = 0,
-	    X_ij  // Task J assigned to machine I
+      Z_k,  // Positive identity, for stabilization
+      W_k,  // Negative identity, for stabilization
+      COL  // A generated column
     };
 
    //Constructors
@@ -39,20 +72,29 @@ public:
 	  int task() const {
         return task_;
     }
-    double value() const {
-        return value_;
-    }
-    double reducedcost() const {
-        return reducedcost_;
+    // Returns the column (only for variables of type COL)
+    const Column column() const {
+      return column_;
     }
 
+    double value() const {
+      return value_;
+    }
+
+    double reducedcost() const {
+      return reducedcost_;
+    }
+
+    double cost() const {
+      return cost_;
+    }
 	
     //==================================================
     // SET METHODS 
     //==================================================
     // Reset variables values
 	  
-    void reset();
+    void Clear();
 
 	  // Set variable type
 	  void set_type(VariableType t) {
@@ -67,12 +109,22 @@ public:
         task_ = task;
     }
 
-	  // Set value
+    void set_column(const Column& column) {
+      this->column_ = column;
+    }
+
+    void set_column_index(int index) {
+      this->column_->set_index(index);
+    }
+
 	  void set_value(double value) {
         value_ = value;
     }
 
-	  // Set reduced cost
+    void set_cost(double cost) {
+      cost_ = cost;
+    }
+
 	  void set_reducedcost(double reducedcost) {
         reducedcost_ = reducedcost;
     }
@@ -91,17 +143,13 @@ public:
    std::string ToString() const;
 
 private:
-
-	//tipo da variavel
-    VariableType type_;
-
-    // machine
-    int machine_;
-
-    // task
-    int task_;
+  VariableType type_;
+  int machine_;
+  int task_;
+  Column column_;
 
 	double value_;
+  double cost_;
 	double reducedcost_;
 };
 
