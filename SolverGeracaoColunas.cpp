@@ -13,8 +13,7 @@ SolverGeracaoColunas::SolverGeracaoColunas(ProblemData* problem_data) :
   column_count_(0) {
 }
 
-SolverGeracaoColunas::~SolverGeracaoColunas()
-{
+SolverGeracaoColunas::~SolverGeracaoColunas() {
     if (lp_ != NULL)
         delete lp_;
 }
@@ -205,11 +204,9 @@ double SolverGeracaoColunas::GenerateColumns(const ProblemData& p,
   return objective_value;
 }
 
-double SolverGeracaoColunas::GenerateColumnsWithStabilization(const ProblemData& p,
-                                                              OPT_LP* lp,
-                                                              int* num_columns,
-                                                              vector<vector<short> >* fixed_vars,
-                                                              double best_solution_value) {
+double SolverGeracaoColunas::GenerateColumnsWithStabilization(
+    const ProblemData& p, OPT_LP* lp, int* num_columns,
+    vector<vector<short> >* fixed_vars, double best_solution_value) {
   // TODO(danielrocha): add the stabilization here.
   return GenerateColumns(p, lp, num_columns, fixed_vars, best_solution_value);
 }
@@ -440,8 +437,8 @@ double SolverGeracaoColunas::BB(const ProblemData& p,
                            fixed_task,
                            num_nodes_limit,
                            new_lower_bound,
-                           lp,
                            p,
+                           lp,
                            best_solution,
                            fixed_vars,
                            num_columns,
@@ -455,8 +452,8 @@ double SolverGeracaoColunas::BB(const ProblemData& p,
                            fixed_task,
                            num_nodes_limit,
                            new_lower_bound,
-                           lp,
                            p,
+                           lp,
                            best_solution,
                            fixed_vars,
                            num_columns,
@@ -491,7 +488,7 @@ void SolverGeracaoColunas::SetAndStoreFixedVariables(
   }
 }
 
-bool ShouldRemoveColumnWhenFixing(
+bool SolverGeracaoColunas::ShouldRemoveColumnWhenFixing(
     FixingSense sense, const VariableGeracaoColunas& var,
     int fixed_machine, int fixed_task) {
   switch (sense) {
@@ -537,7 +534,7 @@ bool ShouldRemoveColumnWhenFixing(
 void SolverGeracaoColunas::FixVariableAndContinueBB(
     FixingSense fixing_sense, int fixed_machine, int fixed_task,
     int num_nodes_limit, double lower_bound,
-    const ProblemData& p, double lower_bound, OPT_LP* lp,
+    const ProblemData& p, OPT_LP* lp,
     ProblemSolution* best_solution,
     vector<vector<short> >* fixed_vars, int* num_columns, int depth,
     double* pct_tree_solved, int* num_visited_nodes, STATUS_BB* status) {
@@ -639,19 +636,23 @@ int SolverGeracaoColunas::SelectFixedVariable(
        it != candidates.end(); ++it) {
     const FixingCandidate& candidate = *it;
  
+    int num_visited_nodes = 0;
     double pct_tree_solved = 0.0;
     STATUS_BB status;
 
     double fixed_on_zero =
       FixVariableAndContinueBB(FIX_ON_ZERO, candidate.machine, candidate.task, 1,
                                1000000, p, lp, best_solution, fixed_vars,
-                               num_columns, 0, pct_tree_solved, nosVisitados, status);
+                               num_columns, 0, pct_tree_solved,
+                               num_visited_nodes, status);
 
+    num_visited_nodes = 0;
     pct_tree_solved = 0.0;
     double fixed_on_one =
       FixVariableAndContinueBB(FIX_ON_ONE, candidate.machine, candidate.task, 1,
                                1000000, p, lp, best_solution, fixed_vars,
-                               num_columns, 0, pct_tree_solved, nosVisitados, status);
+                               num_columns, 0, pct_tree_solved,
+                               num_visited_nodes, status);
     // TODO(danielrocha): porque diabos otimizar aqui??
     lp->optimize(METHOD_DUAL);
 
@@ -848,9 +849,6 @@ STATUS_BB SolverGeracaoColunas::SolveWithCutoff(int time_limit, double cut_off, 
   lp->createLP("FormulacaoGeracaoColunas", OPTSENSE_MINIMIZE, PROB_LP);
   SetUpCplexParams(lp);
 
-  // TODO(danielrocha): continuar a partir daqui
-
-  // escreveLinhas()
   AddSumAssignmentsPerTaskEqualsOneConstraints(*problem_data_, &cHash_, lp);
   AddSumAssignmentsPerMachineAtMostOneConstraints(*problem_data_, &cHash_, lp);
 

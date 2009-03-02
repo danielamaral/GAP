@@ -66,13 +66,13 @@ private:
                     int machine, int index, const vector<int>& tasks,
                     VariableGeracaoColunasHash* vHash, OPT_LP* lp);
 
-  void AddStabilizationColumns(const ProblemData& p,
-                               const vector<double>& relaxed_dual_values,
-                               VariableGeracaoColunasHash* vHash, OPT_LP* lp);
+  void AddStabilizationColumnsWithCoeficients(
+      const ProblemData& p, const vector<double>& relaxed_dual_values,
+      VariableGeracaoColunasHash* vHash, OPT_LP* lp);
 
-  void AddIntegerSolutionToModel(const ProblemData& p,
-                                 const vector<double>& relaxed_dual_values,
-                                 VariableGeracaoColunasHash* vHash, OPT_LP* lp);
+  void AddIntegerSolutionColumnsWithCoeficients(
+      const ProblemData& p, const vector<double>& relaxed_dual_values,
+      VariableGeracaoColunasHash* vHash, OPT_LP* lp);
 
   /********************************************************************
   **                    CONSTRAINT CREATION                          **
@@ -116,9 +116,11 @@ private:
             int depth,
             double lower_bound,
             OPT_LP* lp,
-            int* best_integer,
+            double* best_solution_value,
             ProblemSolution* best_solution,
-            vector<vector<short> >* fixed,
+            vector<vector<short> >* fixed_vars,
+            int* num_columns,
+            double* pct_tree_solved,
             int* num_visited_nodes,
             STATUS_BB* status);
 
@@ -142,8 +144,8 @@ private:
   void FixVariableAndContinueBB(
     FixingSense fixing_sense, int fixed_machine, int fixed_task,
     int num_nodes_limit, double lower_bound, const ProblemData& p,
-    double lower_bound, OPT_LP* lp, double* best_solution_value,
-    ProblemSolution* best_solution, vector<vector<short> >* fixed_vars,
+    OPT_LP* lp, ProblemSolution* best_solution,
+    vector<vector<short> >* fixed_vars,
     int* num_columns, int depth, double* pct_tree_solved,
     int* num_visited_nodes, STATUS_BB* status);
 
@@ -152,7 +154,6 @@ private:
   // rápido ("raso") BB para escolher a que gera o melhor lower bound.
   int SelectFixedVariable(const ProblemData& p, int num_vars_lookup,
                           vector<vector<double> >* x, OPT_LP* lp,
-                          double* best_solution_value,
                           ProblemSolution* best_solution,
                           vector<vector<short> >* fixed_vars, int* num_columns,
                           int* fixed_machine, int* fixed_task);
