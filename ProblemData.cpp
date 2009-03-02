@@ -85,7 +85,7 @@ void ProblemData::set_optimal(int o) {
     optimal_ = o;
 }
 
-int ProblemData::AssignmentCost(int machine, vector<int> assignment) {
+int ProblemData::AssignmentCost(int machine, const vector<int>& assignment) const {
   int cost = 0;
   for (int t = 0; t < this->num_tasks(); ++t) {
     if (assignment[t] == 1)
@@ -94,11 +94,15 @@ int ProblemData::AssignmentCost(int machine, vector<int> assignment) {
   return cost;
 }
 
-int ProblemData::AssignmentConsume(int machine, vector<int> assignment) {
+int ProblemData::AssignmentConsume(int machine, const vector<int>& assignment) const {
   int consume = 0;
   for (int t = 0; t < this->num_tasks(); ++t) {
     if (assignment[t] == 1)
       consume += this->consume(machine, t);
   }
   return consume;
+}
+
+const int* ProblemData::GetConsumeVector(int machine) const {
+  return consume_[machine];
 }

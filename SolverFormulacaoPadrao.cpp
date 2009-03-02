@@ -361,7 +361,7 @@ void SolverFormulacaoPadrao::SolveTLAndUB(int time_limit, double upper_bound,
 
   lp->optimize(METHOD_DUAL);
 
-  dual->reserve(lp->getNumRows());
+  dual->resize(lp->getNumRows());
   lp->getPi(static_cast<double*>(&(dual->at(0))));
 }
 

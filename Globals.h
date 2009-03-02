@@ -22,6 +22,7 @@ public:
   }
   static double Infinity() { return kInfinity_; };
   static double EPS() { return Epsilon_; };
+  static double BigEPS() { return BigEpsilon_; }
 private:
   Globals();
   Globals(const Globals&);
@@ -31,6 +32,7 @@ private:
   static ProblemData* instance_;
 	static double kInfinity_;
   static double Epsilon_;
+  static double BigEpsilon_;
 };
 
 #endif

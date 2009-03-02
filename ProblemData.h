@@ -1,6 +1,10 @@
 #ifndef PROBLEMDATA_H
 #define PROBLEMDATA_H
 
+#include <vector>
+
+using namespace std;
+
 class ProblemData
 {
 public:
@@ -25,9 +29,9 @@ public:
     /// Sets the capacity of 'machine'
     void set_capacity(int machine, int c);
     
-    int AssignmentCost(int machine, vector<int> assignment);
-    int AssignmentConsume(int machine, vector<int> assignment);
-
+    int AssignmentCost(int machine, const vector<int>& assignment) const;
+    int AssignmentConsume(int machine, const vector<int>& assignment) const;
+    const int* GetConsumeVector(int machine) const;
 
     /// Returns the number of machines (agents, etc)
     int m() const;

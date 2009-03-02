@@ -1,33 +1,41 @@
 #pragma once
 
 #include <cstdio>
-#include <map>
+
 #include <hash_map>
+#include <map>
+#include <vector>
+
+using namespace std;
 
 class Column {
 public:
-  void Column(int machine, int index, const vector<int>& tasks) :
+  Column(int machine, int index, const vector<int>& tasks) :
       machine_(machine),
       index_(index),
       tasks_(tasks) {
   }
 
-  void Column(const Column& c) {
+  Column(const Column& c) {
     this->machine_ = c.machine();
     this->tasks_ = c.tasks();
     this->index_ = c.index();
   }
 
+  Column() {
+    Clear();
+  }
+
   void Clear() {
     this->machine_ = -1;
-    this->index = -1;
+    this->index_ = -1;
     this->tasks_.clear();
   }
 
   void set_index(int i) { index_ = i; }
-  int index() { return index_; }
-  int machine() { return machine_; }
-  const vector<int>& tasks() { return tasks_; }
+  int index() const { return index_; }
+  int machine() const { return machine_; }
+  const vector<int>& tasks() const { return tasks_; }
 
 private:
   vector<int> tasks_;
@@ -114,7 +122,7 @@ public:
     }
 
     void set_column_index(int index) {
-      this->column_->set_index(index);
+      this->column_.set_index(index);
     }
 
 	  void set_value(double value) {

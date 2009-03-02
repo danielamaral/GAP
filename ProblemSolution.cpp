@@ -58,6 +58,10 @@ int ProblemSolution::cost() const {
     return cost_;
 }
 
+void ProblemSolution::set_cost(int c) {
+  cost_ = c;
+}
+
 int ProblemSolution::Distance(const ProblemSolution& sol) const {
 	int d = 0;
 	for (int i = 0; i < n(); ++i)
@@ -76,7 +80,7 @@ void ProblemSolution::GetMachineAssignments(int mac,
                                             vector<bool>* assign) const {
   assign->reserve(this->num_tasks());
   for (int i = 0; i < this->num_tasks(); ++i)
-    (*assign[i]) = this->assignment(i) == mac;
+    (*assign)[i] = this->assignment(i) == mac;
 }
 
 void ProblemSolution::GetMachineAssignments(int mac,

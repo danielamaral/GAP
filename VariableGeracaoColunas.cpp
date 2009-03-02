@@ -132,7 +132,7 @@ size_t VariableGeracaoColunasHasher::operator()(
     sum *= kHashPrime;
     sum += h.operator ()(var.task());
   }
-  if (var.type() == COL && var.column().index() >= 0) {
+  if (var.type() == VariableGeracaoColunas::COL && var.column().index() >= 0) {
     sum *= kHashPrime;
     sum += h.operator ()(var.column().index());
   }

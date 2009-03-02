@@ -4,7 +4,7 @@
 
 ConstraintGeracaoColunas::ConstraintGeracaoColunas() {
 	dualvalue_ = 1.0;
-	reset();
+	Clear();
 }
 
 ConstraintGeracaoColunas::ConstraintGeracaoColunas(

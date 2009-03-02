@@ -3,6 +3,8 @@
 #include <iostream>
 #include <vector>
 
+using namespace std;
+
 class ProblemData;
 
 //Stores output data
@@ -47,6 +49,7 @@ public:
    int used(int machine) const;
    /// The final cost of the solution
    int cost() const;
+   void set_cost(int cost);
    /// The cost of the current assignment of tasks to machine 'mac'. 
    int AssignmentCost(int mac) const;
    /// Clears the solution to its unassigned state

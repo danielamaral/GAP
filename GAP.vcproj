@@ -321,6 +321,19 @@
 				>
 			</File>
 			<File
+				RelativePath=".\minknap.c"
+				>
+				<FileConfiguration
+					Name="Release|Win32"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+						CompileAsManaged="0"
+						CompileAs="1"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
 				RelativePath=".\ProblemData.cpp"
 				>
 			</File>

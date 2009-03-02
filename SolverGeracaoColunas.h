@@ -2,6 +2,8 @@
 
 #include <fstream>
 #include <sstream>
+#include <vector>
+
 #include "solver.h"
 #include "opt_lp.h"
 #include "ConstraintGeracaoColunas.h"
@@ -9,14 +11,16 @@
 #include "ProblemSolution.h"
 #include "VariableGeracaoColunas.h"
 
+using namespace std;
+
 class SolverStatus;
 
 class FixingCandidate {
 public:
   FixingCandidate() : task(-1), machine(-1), value(0.0) {}
-  bool operator<(const FixingCandidate& cand) {
+  bool operator<(const FixingCandidate& cand) const {
     if (this->value != cand.value)
-      return this->value > cand.value;
+      return this->value < cand.value;
     if (this->task != cand.task)
       return this->task < cand.task;
     return this->machine < cand.machine;
@@ -35,15 +39,19 @@ public:
   **                SOLVING AND RESULTS METHODS                      **
   *********************************************************************/
 
+  int Solve();
 	void Solve(int time_limit, SolverStatus* status);	
 	void SolveWithCutoff(int time_limit, double cutoff,
                        bool first, SolverStatus* status);
-	STATUS_BB SolveWithCutoff(int time_limit, double cutoff, bool first = false);
+	OPTSTAT SolveWithCutoff(int time_limit, double cutoff, bool first = false);
 	double GetGapRelative();
 	double GetGapAbsolute();
 
   /// Generates a ProblemSolution from the X vector
-  void GenerateSolution(ProblemSolution* ps);
+  void GenerateSolution(const ProblemData& p,
+                        const VariableGeracaoColunasHash& vHash,
+                        const OPT_LP& lp,
+                        ProblemSolution* sol) const;
 
   /********************************************************************
   **                 LOCAL SEARCH CONSTRAINTS                        **
@@ -58,12 +66,21 @@ private:
   /// Initializes the problem (creates variables and constraints)
   void SetUpCplexParams(OPT_LP* lp);
 
+  /// Generates a Xij matrix from the given fractionary solution
+  void GetXijMatrix(const vector<double>& current_sol,
+                    const VariableGeracaoColunasHash& vHash,
+                    vector<vector<double> >* x) const;
+
   /********************************************************************
   **             VARIABLE CREATION + STABILIZATION                   **
   *********************************************************************/
 
   void AddNewColumn(double cost, double lower_bound, double upper_bound,
-                    int machine, int index, const vector<int>& tasks,
+                    int machine, const vector<int>& tasks,
+                    VariableGeracaoColunasHash* vHash, OPT_LP* lp);
+
+  void AddNewColumn(const VariableGeracaoColunas& var,
+                    double lower_bound, double upper_bound, 
                     VariableGeracaoColunasHash* vHash, OPT_LP* lp);
 
   void AddStabilizationColumnsWithCoeficients(
@@ -71,7 +88,7 @@ private:
       VariableGeracaoColunasHash* vHash, OPT_LP* lp);
 
   void AddIntegerSolutionColumnsWithCoeficients(
-      const ProblemData& p, const vector<double>& relaxed_dual_values,
+      const ProblemData& p, const ProblemSolution& integer_solution,
       VariableGeracaoColunasHash* vHash, OPT_LP* lp);
 
   /********************************************************************
@@ -90,6 +107,7 @@ private:
                                           int* num_columns,
                                           vector<vector<short> >* fixed_vars,
                                           double best_solution_value);
+
   double GenerateColumns(const ProblemData& p,
                          OPT_LP* lp,
                          int* num_columns,
@@ -104,11 +122,10 @@ private:
   /********************************************************************
   **                    BRANCH AND BOUND METHODS                     **
   *********************************************************************/
-  STATUS_BB SetUpAndRunBranchAndBound(const ProblemData& p,
-                                      int num_nodes_limit,
-                                      double best_integer,
-                                      OPT_LP* lp,
-                                      ProblemSolution* integer_solution);
+  OPTSTAT SetUpAndRunBranchAndBound(const ProblemData& p,
+                                    int num_nodes_limit,
+                                    OPT_LP* lp,
+                                    ProblemSolution* integer_solution);
 
   /// Returns a lower bound
   double BB(const ProblemData& p,
@@ -116,13 +133,12 @@ private:
             int depth,
             double lower_bound,
             OPT_LP* lp,
-            double* best_solution_value,
             ProblemSolution* best_solution,
             vector<vector<short> >* fixed_vars,
             int* num_columns,
             double* pct_tree_solved,
             int* num_visited_nodes,
-            STATUS_BB* status);
+            OPTSTAT* status);
 
   // Funções para fixar o valor de uma variável de alocação (Xij) e continuar
   // o branch and bound. Elas armazenam o estado, fazem as modificações
@@ -134,31 +150,35 @@ private:
   };
 
   void SetAndStoreFixedVariables(
-      FixingSense sense, const ProblemData& p, int fixed_task,
-      vector<vector<short> >* fixed, vector<short> before_fixing);
+      FixingSense sense, const ProblemData& p, int fixed_machine, int fixed_task,
+      vector<vector<short> >* fixed, vector<short>* before_fixing);
 
   bool ShouldRemoveColumnWhenFixing(
       FixingSense sense, const VariableGeracaoColunas& var,
       int fixed_machine, int fixed_task);
 
-  void FixVariableAndContinueBB(
+  double FixVariableAndContinueBB(
     FixingSense fixing_sense, int fixed_machine, int fixed_task,
     int num_nodes_limit, double lower_bound, const ProblemData& p,
     OPT_LP* lp, ProblemSolution* best_solution,
     vector<vector<short> >* fixed_vars,
     int* num_columns, int depth, double* pct_tree_solved,
-    int* num_visited_nodes, STATUS_BB* status);
+    int* num_visited_nodes, OPTSTAT* status);
 
   // Usa uma função heurística para selecionar variáveis candidatas
   // a serem fixadas. Depois pega essas candidatas e submete a um
   // rápido ("raso") BB para escolher a que gera o melhor lower bound.
   int SelectFixedVariable(const ProblemData& p, int num_vars_lookup,
-                          vector<vector<double> >* x, OPT_LP* lp,
+                          const vector<vector<double> >& x, OPT_LP* lp,
                           ProblemSolution* best_solution,
                           vector<vector<short> >* fixed_vars, int* num_columns,
                           int* fixed_machine, int* fixed_task);
 
   double EvaluateVariableToFix(double binary_var);
+
+  OPT_LP* lp_;
+  int num_pivo_;
+  int column_count_;
 
   /** Hash which associates the column number with the Variable object. */
   VariableGeracaoColunasHash vHash_;
@@ -166,10 +186,6 @@ private:
   /** Hash which associates the row number with the Constraint object. */
   ConstraintGeracaoColunasHash cHash_;
 
-  int num_pivo_;
-  int column_count_;
-  static int kMaxNumberColumns_ = 40000;
-  static int kNumColumnsToRemove_ = 10000;
-  static int kMaxDepthFixingVars_ = 4;
-  static int kNumberOfLookupsFixingVars_[kMaxDepthFixingVars_] = { 10, 8, 6, 4 };
+  static const int kMaxNumberColumns_ = 40000;
+  static const int kNumColumnsToRemove_ = 10000;
 };

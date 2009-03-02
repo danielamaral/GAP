@@ -16,33 +16,34 @@ using namespace System::Diagnostics;
 #include "ProblemSolution.h"
 #include "Solver.h"
 #include "SolverFormulacaoPadrao.h"
+#include "SolverGeracaoColunas.h"
 
 int main(int argc, char* argv[])
 {
-    const int kNumberArguments = 5;
-    if (argc < kNumberArguments) {
-        cout << "Error loading instance file, not enough command line arguments" << endl;
-        cout << "Usage: " << argv[0] << " INSTANCE_FILE RANDOM_SEED UPPER_BOUND ALGORITHM VERBOSE_LEVEL" << endl;
-        return 1;
-    }
+  const int kNumberArguments = 6;
+  if (argc < kNumberArguments) {
+      cout << "Error loading instance file, not enough command line arguments" << endl;
+      cout << "Usage: " << argv[0] << " INSTANCE_FILE RANDOM_SEED UPPER_BOUND ALGORITHM VERBOSE_LEVEL" << endl;
+      return 1;
+  }
 	string instance_file(argv[1]);
 	int random_seed = atoi(argv[2]);
 	int upper_bound = atoi(argv[3]);
 	string algorithm(argv[4]);
 	int verbosity = atoi(argv[5]);
 
-    Globals::rg()->RandomInit(random_seed);
+  Globals::rg()->RandomInit(random_seed);
 
-    ProblemDataLoader loader(instance_file.c_str(), upper_bound, Globals::instance());
-    loader.load();
-    cout << "Loading input..." << endl;
+  ProblemDataLoader loader(instance_file.c_str(), upper_bound, Globals::instance());
+  loader.load();
+  cout << "Loading input..." << endl;
 
 	// Solver
-	SolverFormulacaoPadrao solver(Globals::instance());
-	solver.Init();
+	//SolverFormulacaoPadrao solver(Globals::instance());
+  SolverGeracaoColunas solver(Globals::instance());
 
-    // to keep the time
-    Stopwatch^ sw = gcnew Stopwatch();
+  // to keep the time
+  Stopwatch^ sw = gcnew Stopwatch();
 
 	// final solution
 	ProblemSolution final_sol(Globals::instance());

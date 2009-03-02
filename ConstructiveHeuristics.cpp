@@ -11,7 +11,7 @@ namespace ConstructiveHeuristics {
         // for each task
 restart:
 		std::cout << "attempting" << std::endl;
-		sol->Reset();
+		sol->Clear();
         for (int i = 0; i < pd.n(); ++i) {
             // randomly select a machine
             int machine;
