@@ -132,7 +132,7 @@ double SolverGeracaoColunas::GenerateColumns(const ProblemData& p,
     }
     
     // Os valores duais servirão para setar os preços para o subproblema
-    vector<double> dual_values(lp->getNumRows());
+    vector<double> dual_values(lp->getNumRows(), 0.0);
     lp->getPi(&dual_values[0]);
 
     int num_exact_knapsacks = 0;
@@ -261,7 +261,7 @@ OPTSTAT SolverGeracaoColunas::SetUpAndRunBranchAndBound(const ProblemData& p,
 
   // Cria uma matriz de variáveis fixadas, deixando inicialmente todas não fixadas
   vector<vector<short> > fixed_vars(p.num_machines(),
-                                    vector<short>(-1, p.num_tasks()));
+                                    vector<short>(p.num_tasks(), -1));
 
   OPTSTAT status = OPTSTAT_NOINTEGER;
   BB(p,
@@ -326,6 +326,7 @@ double SolverGeracaoColunas::BB(const ProblemData& p,
   // O lower bound encontrado nesse nó _tem_ que ser pelo menos tão bom quanto o anterior.
   assert(new_lower_bound + Globals::EPS() >= lower_bound);
 
+  lp->optimize(METHOD_PRIMAL);
   vector<double> current_solution(lp->getNumCols());
   lp->getX(&current_solution[0]);
 
@@ -518,7 +519,7 @@ bool SolverGeracaoColunas::ShouldRemoveColumnWhenFixing(
         // Se nessa coluna 'fixed_task' esta associada à 'fixed_machine'
         if (find(tasks.begin(), tasks.end(), fixed_task) != tasks.end()) {
           // TODO(danielrocha): add CHECKS
-          assert(lp_->getCoef(fixed_task, fixed_machine) > 1.0 - Globals::EPS());
+          //assert(lp_->getCoef(fixed_task, fixed_machine) > 1.0 - Globals::EPS());
           //assert(lp_->getObj(index) == var.cost());
           return true;
         }
@@ -825,7 +826,7 @@ void SolverGeracaoColunas::AddSumAssignmentsPerTaskEqualsOneConstraints(
     }
 
     (*cHash)[cons] = lp->getNumRows();
-    lp->addRow(OPT_ROW(OPT_ROW::EQUAL, 1.0), cons.ToString().c_str());
+    lp->newRow(OPT_ROW(OPT_ROW::EQUAL, 1.0, const_cast<char*>(cons.ToString().c_str())));
   }
 }
 
@@ -844,7 +845,11 @@ void SolverGeracaoColunas::AddSumAssignmentsPerMachineAtMostOneConstraints(
     }
 
     (*cHash)[cons] = lp->getNumRows();
-    lp->addRow(OPT_ROW(OPT_ROW::LESS, 1.0), cons.ToString().c_str());
+    OPT_ROW row(0);
+    row.setSense(OPT_ROW::LESS);
+    row.setRhs(1.0);
+    row.setName(const_cast<char*>(cons.ToString().c_str()));
+    lp->newRow(row);
   }
 }
 

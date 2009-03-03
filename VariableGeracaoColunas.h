@@ -81,7 +81,7 @@ public:
         return task_;
     }
     // Returns the column (only for variables of type COL)
-    const Column column() const {
+    const Column& column() const {
       return column_;
     }
 
