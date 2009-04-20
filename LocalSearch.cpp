@@ -8,25 +8,29 @@ using namespace System::Diagnostics;
 #include "ProblemData.h"
 
 void LocalSearch::SimpleOPTSearch(const ProblemSolution& init_sol,
-								  int max_opt,
-								  int k_step,
-								  int total_time,
-								  int initial_time,
-								  int ls_time,
-								  ProblemSolution* sol) {
+                                  int max_opt,
+                                  int k_step,
+                                  int total_time,
+                                  int initial_time,
+                                  int ls_time,
+                                  ProblemSolution* sol) {
 	double UB = Globals::Infinity();
 	// to keep the time
-    Stopwatch^ sw = gcnew Stopwatch();
+  Stopwatch^ sw = gcnew Stopwatch();
 
-    // creates solver
-    SolverFormulacaoPadrao solver(Globals::instance());
-    solver.Init();
-    *sol = init_sol;
+  // creates solver
+  SolverFormulacaoPadrao solver(Globals::instance());
+  solver.Init(SolverOptions());
+  *sol = init_sol;
 
 	// Tries to generate the first solution
-	int status;
+  SolverOptions options;
+  options.set_cut_off_value(UB);
+  options.set_max_time(initial_time);
+  SolverStatus dummy_status;
+
 	sw->Start();
-	status = solver.SolveTLAndUB(initial_time, UB);
+	int status = solver.Solve(options, &dummy_status);
 	sw->Stop();
 	if (status == OPTSTAT_NOINTEGER || status == OPTSTAT_INFEASIBLE)
 		return; // error, could not generate first solution
@@ -37,7 +41,8 @@ void LocalSearch::SimpleOPTSearch(const ProblemSolution& init_sol,
         ProblemSolution oldsol = *sol;
         if (cons >= 0) solver.RemoveConstraint(cons);
         cons = solver.AddConsMaxAssignmentChanges(*sol, opt);
-        status = solver.Solve(ls_time);
+        SolverOptions options; options.set_max_time(ls_time);
+        status = solver.Solve(options, NULL);
         solver.GenerateSolution(sol);
         cout << "OPT = " << opt << " - new solution: " << sol->cost() << endl;
         if (*sol == oldsol) {
@@ -50,30 +55,31 @@ void LocalSearch::SimpleOPTSearch(const ProblemSolution& init_sol,
 }
 
 uint64 LocalSearch::EllipsoidalSearch(const ProblemSolution& x1,
-									  const ProblemSolution& x2,
-									  int max_opt,
-									  int k_step,
-									  int step_time,
-									  int total_time,
-									  ProblemSolution* final_sol) {
+                                      const ProblemSolution& x2,
+                                      int max_opt,
+                                      int k_step,
+                                      int step_time,
+                                      int total_time,
+                                      ProblemSolution* final_sol) {
 
 	// to keep the time
 	uint64 elapsed_time = 0;
-    Stopwatch^ sw = gcnew Stopwatch();
+  Stopwatch^ sw = gcnew Stopwatch();
 
-    // creates solver
-    SolverFormulacaoPadrao solver(Globals::instance());
-    solver.Init();
+  // creates solver
+  SolverOptions options; options.set_max_time(step_time);
+  SolverFormulacaoPadrao solver(Globals::instance());
+  solver.Init(options);
 
 	ProblemSolution best_sol(Globals::instance());
 	best_sol = x1;
 
-    int opt = 0;
+  int opt = 0;
 	for (int opt = k_step; opt <= max_opt && elapsed_time < total_time; opt += k_step) {
 		solver.UpdateConsMaxAssignmentChangesEllipsoidal(x1, x2, opt);
 		
 		sw->Start();
-		int status = solver.SolveTLAndUB(step_time, Globals::Infinity());
+		int status = solver.Solve(options, NULL);
 		sw->Stop();
 		elapsed_time += sw->ElapsedMilliseconds;
 		sw->Reset();
@@ -115,151 +121,186 @@ void LocalSearch::MultiEllipsoidalSearch() {
 	LocalSearch::EllipsoidalSearch(pool[sol_i], pool[sol_j], 20, 1, 100, 10000, &final_sol);
 }
 
-void LocalSearch::VNSBra(int total_time_limit,
-						 int node_time_limit,
-						 int k_step,
-						 SolverStatus* status) {
-    int iter = 0;
+void LocalSearch::VNSBra(SolverFactory* solver_factory,
+                         int total_time_limit,
+                         int node_time_limit,
+                         int k_step,
+                         SolverStatus* status) {
+  int iter = 0;
 
-    // to keep the time
-    uint64 elapsed_time = 0;
-    Stopwatch^ sw = gcnew Stopwatch();
+  // to keep the time
+  uint64 elapsed_time = 0;
+  Stopwatch^ sw = gcnew Stopwatch();
 
-    ProblemSolution x_ini(Globals::instance()), x_opt(Globals::instance());
-    SolverFormulacaoPadrao solver_intensification(Globals::instance());
-	SolverFormulacaoPadrao solver_diversification(Globals::instance());
-    solver_intensification.Init();
-	solver_diversification.Init();
+  SolverOptions initial_options;
+  initial_options.set_only_first_solution(true);
+  ProblemSolution x_ini(Globals::instance()), x_opt(Globals::instance());
+  VnsSolver* solver_intensification = solver_factory->NewVnsSolver(Globals::instance());
+  VnsSolver* solver_diversification = solver_factory->NewVnsSolver(Globals::instance());
+  solver_intensification->Init(initial_options);
+	solver_diversification->Init(initial_options);
 
-    int k_cur = k_step;
-    int TL = total_time_limit;
+  int k_cur = k_step;
+  int TL = total_time_limit;
 	double UB = Globals::Infinity();
 
-    solver_intensification.SolveTLAndUB(TL, UB, true); // status = MIPSOLVE(TL, UB, first = true, x_opt, f_opt)
-    solver_intensification.GenerateSolution(&x_opt);// creates initial solution
+  SolverOptions options;
+  options.set_cut_off_value(UB);
+  options.set_max_time(TL);
+  options.set_only_first_solution(true);
+  // status = MIPSOLVE(TL, UB, first = true, x_opt, f_opt)
+  solver_intensification->Solve(options, NULL);
+  solver_intensification->GenerateSolution(&x_opt);  // creates initial solution
 
-    ProblemSolution x_cur = x_opt;
-    double f_cur = x_opt.cost();
-    while (elapsed_time < total_time_limit) {
-        cout << "Iteration " << ++iter << " - elapsed time: " << static_cast<double>(elapsed_time) / 1000.0 << "s" << endl;
-		elapsed_time += VNSIntensification(
-			&solver_intensification,
-			Globals::instance()->n(),
-			1,
-			total_time_limit - static_cast<int>(elapsed_time),
-			node_time_limit,
-			&x_cur);
+  ProblemSolution x_cur = x_opt;
+  double f_cur = x_opt.cost();
+  while (elapsed_time < total_time_limit) {
+    cout << "Iteration " << ++iter << " - elapsed time: "
+         << static_cast<double>(elapsed_time) / 1000.0 << "s" << endl;
+		elapsed_time += VNSIntensification(solver_intensification,
+                                       Globals::instance()->n(),
+                                       1,
+                                       total_time_limit - static_cast<int>(elapsed_time),
+                                       node_time_limit,
+                                       &x_cur);
 
-        if (x_cur.cost() < x_opt.cost()) {  //f_cur < f_opt
-            x_opt = x_cur;  // and f_opt = f_cur;
-            k_cur = k_step;
-        } else {
-            k_cur = k_cur + k_step;
-        }
+    if (x_cur.cost() < x_opt.cost()) {  //f_cur < f_opt
+      x_opt = x_cur;  // and f_opt = f_cur;
+      k_cur = k_step;
+    } else {
+      k_cur = k_cur + k_step;
+    }
 
-        // stopping condition
-        if (x_opt.cost() == Globals::instance()->optimal()) {
-            break;
-        }
+    // stopping condition
+    if (x_opt.cost() == Globals::instance()->optimal()) {
+      break;
+    }
 
-        bool cont = true;
-        while (cont && elapsed_time < total_time_limit && k_cur + k_step <= Globals::instance()->n()) {
-            int last_cons_less = solver_diversification.AddConsMinAssignmentChanges(x_opt, k_cur);  // add constraint k_cur <= delta(x, x_opt)
-            int last_cons_greater = solver_diversification.AddConsMaxAssignmentChanges(x_opt, k_cur + k_step);  // add constraint delta(x, x_opt) <= k_cur + k_step
-            TL = total_time_limit - static_cast<int>(elapsed_time);
-			UB = Globals::Infinity(); //UB = x_opt.cost();
+    bool cont = true;
+    while (cont &&
+           elapsed_time < total_time_limit &&
+           k_cur + k_step <= Globals::instance()->n()) {
+      // add constraint k_cur <= delta(x, x_opt)
+      int last_cons_less =
+        solver_diversification->AddConsMinAssignmentChanges(x_opt, k_cur);
 
-            sw->Start();
-            // first = true implies first best strategy, first = false implies best overall strategy
-            int status = solver_diversification.SolveTLAndUB(TL / 1000, UB, true); // status = MIPSOLVE(TL, UB, first = true/false, x_cur, f_cur)
-            sw->Stop();
-            elapsed_time += sw->ElapsedMilliseconds;
-            sw->Reset();
-            cout << "Shaking Step - RHS = [" << k_cur << "," << k_cur + k_step << "], TL = " << TL / 1000 << "s, UB = " << UB << ", status = " << status << endl;
+      // add constraint delta(x, x_opt) <= k_cur + k_step
+      int last_cons_greater =
+        solver_diversification->AddConsMaxAssignmentChanges(x_opt, k_cur + k_step);
 
-            solver_diversification.RemoveConstraint(last_cons_less, last_cons_greater);  // remove last two added constraints
-            cont = false;
+      TL = total_time_limit - static_cast<int>(elapsed_time);
+      UB = Globals::Infinity();  //UB = x_opt.cost();
+
+      sw->Start();
+      SolverOptions options;
+      options.set_cut_off_value(UB);
+      options.set_max_time(TL * 1000.0);  // Converts milliseconds to seconds.
+      options.set_only_first_solution(true);
+
+      // status = MIPSOLVE(TL, UB, first = true/false, x_cur, f_cur)
+      int status = solver_diversification->Solve(options, NULL);
+      sw->Stop();
+      elapsed_time += sw->ElapsedMilliseconds;
+      sw->Reset();
+      cout << "Shaking Step - RHS = [" << k_cur << "," << k_cur + k_step
+           << "], TL = " << TL / 1000 << "s, UB = " << UB << ", status = "
+           << status << endl;
+
+      // remove last two added constraints
+      solver_diversification->RemoveConstraint(last_cons_less, last_cons_greater);  
+
+      cont = false;
 			if (status == OPTSTAT_FEASIBLE || status == OPTSTAT_MIPOPTIMAL) {
 				cont = false;
-				solver_diversification.GenerateSolution(&x_cur);
+				solver_diversification->GenerateSolution(&x_cur);
 				cout << "Shaking Step - stopping, found feasible/optimal solution: " << x_cur.cost();
 			} else {
-                cont = true;
-                k_cur = k_cur + k_step;
-                cout << "Shaking Step - infeasible, continuing with disc size " << k_cur << endl;
+        cont = true;
+        k_cur = k_cur + k_step;
+        cout << "Shaking Step - infeasible, continuing with disc size " << k_cur << endl;
 			}
-        }
     }
+  }
 	status->final_sol = x_opt;
 	status->str_status = "heuristic";
 	status->time = elapsed_time / 1000.0;
+  delete solver_intensification;
+  delete solver_diversification;
 }
 
-uint64 LocalSearch::VNSIntensification(SolverFormulacaoPadrao *solver_intensification,
-									   int max_opt,
-									   int k_step,
-									   int total_time_limit,
-									   int node_time_limit,
-									   ProblemSolution* x_cur) {
-    // to keep the time
+uint64 LocalSearch::VNSIntensification(VnsSolver *solver_intensification,
+                                       int max_opt,
+                                       int k_step,
+                                       int total_time_limit,
+                                       int node_time_limit,
+                                       ProblemSolution* x_cur) {
+  // to keep the time
 	uint64 elapsed_time = 0;
-    Stopwatch^ sw = gcnew Stopwatch();
+  Stopwatch^ sw = gcnew Stopwatch();
 
 	// constraints added during search and that will be removed after it
 	deque<int> added_cons;
 
-    bool cont = true;
-    int rhs = k_step;
-    while (cont && elapsed_time < total_time_limit && rhs < max_opt) {
-        int TL = min(node_time_limit, total_time_limit - static_cast<int>(elapsed_time));
-        added_cons.push_back(solver_intensification->AddConsMaxAssignmentChanges(*x_cur, rhs));  // add local branching constraint delta(x, x_cur) <= rhs
-        double UB = x_cur->cost();  // UB = f_cur;
+  bool cont = true;
+  int rhs = k_step;
+  while (cont && elapsed_time < total_time_limit && rhs < max_opt) {
+    int TL = min(node_time_limit, total_time_limit - static_cast<int>(elapsed_time));
+    // add local branching constraint delta(x, x_cur) <= rhs
+    added_cons.push_back(solver_intensification->AddConsMaxAssignmentChanges(*x_cur, rhs));
+    double UB = x_cur->cost();  // UB = f_cur;
 
-		//solver_intensification->AddConsIntegerSolutionStrongCuttingPlane(*x_cur);
+	//solver_intensification->AddConsIntegerSolutionStrongCuttingPlane(*x_cur);
 
-        // runs CPLEX
-        sw->Start();
-        int status = solver_intensification->SolveTLAndUB(TL / 1000, UB);  // status = MIPSOLVE(TL, UB, first = false, x_next, f_next)
-        sw->Stop();
-        elapsed_time += sw->ElapsedMilliseconds;
-        sw->Reset();
+    // runs CPLEX
+    sw->Start();
+    // status = MIPSOLVE(TL, UB, first = false, x_next, f_next)
+    SolverOptions options; options.set_max_time(TL / 1000); options.set_cut_off_value(UB);
+    int status = solver_intensification->Solve(options, NULL);
+    sw->Stop();
+    elapsed_time += sw->ElapsedMilliseconds;
+    sw->Reset();
 
-        cout << "VND search - RHS = " << rhs << ", TL = " << TL / 1000 << "s, UB = " << UB << ", status = " << status << endl;
-        switch(status) {
-            case OPTSTAT_MIPOPTIMAL:
-                cout << "VND search - optimal, reverting constraint to delta(x, x_cur) >= " << rhs + k_step << endl;
-                // x_cur = x_next, f_cur = f_next;
-				solver_intensification->GenerateSolution(x_cur);
-				// reverse last local branching constraint into delta(x, x_cur) >= rhs + 1
-                solver_intensification->ReverseConstraint(added_cons.back(), rhs + k_step);
-                rhs = k_step;
-                break;
-            case OPTSTAT_FEASIBLE:
-                cout << "VND search - feasible, reverting constraint to delta(x, x_cur) >= " << k_step << endl;
-				//x_cur = x_next, f_cur = f_next;
-                solver_intensification->GenerateSolution(x_cur);
-				// reverse last local branching constraint into delta(x, x_cur) >= k_step
-                solver_intensification->ReverseConstraint(added_cons.back(), k_step);
-                rhs = k_step;
-                break;
-            case OPTSTAT_INFEASIBLE:
-                cout << "VND search - proven infeasible, removing last constraint, new RHS = " << rhs + k_step << endl;
-				// remove last local branching constraint;
-                solver_intensification->RemoveConstraint(added_cons.back());
-                added_cons.pop_back();
-                rhs += k_step;
-                break;
-            case OPTSTAT_NOINTEGER:
-                cout << "VND search - infeasible, breaking out of the search" << endl;
-                cont = false;
-                break;
-        }
-        // stopping condition
-        if (rhs >= Globals::instance()->n() ||
-			((status == OPTSTAT_MIPOPTIMAL || status == OPTSTAT_FEASIBLE) && x_cur->cost() == Globals::instance()->optimal())) {
-			cont = false;
-        }
+    cout << "VND search - RHS = " << rhs << ", TL = " << TL / 1000 << "s, UB = "
+         << UB << ", status = " << status << endl;
+    switch(status) {
+      case OPTSTAT_MIPOPTIMAL:
+        cout << "VND search - optimal, reverting constraint to delta(x, x_cur) >= "
+             << rhs + k_step << endl;
+        // x_cur = x_next, f_cur = f_next;
+        solver_intensification->GenerateSolution(x_cur);
+        // reverse last local branching constraint into delta(x, x_cur) >= rhs + k_step
+        solver_intensification->ReverseConstraint(added_cons.back(), rhs + k_step);
+        rhs = k_step;
+        break;
+      case OPTSTAT_FEASIBLE:
+        cout << "VND search - feasible, reverting constraint to delta(x, x_cur) >= "
+             << k_step << endl;
+        //x_cur = x_next, f_cur = f_next;
+        solver_intensification->GenerateSolution(x_cur);
+        // reverse last local branching constraint into delta(x, x_cur) >= k_step
+        solver_intensification->ReverseConstraint(added_cons.back(), k_step);
+        rhs = k_step;
+        break;
+      case OPTSTAT_INFEASIBLE:
+        cout << "VND search - proven infeasible, removing last constraint, new RHS = "
+             << rhs + k_step << endl;
+        // remove last local branching constraint;
+        solver_intensification->RemoveConstraint(added_cons.back());
+        added_cons.pop_back();
+        rhs += k_step;
+        break;
+      case OPTSTAT_NOINTEGER:
+        cout << "VND search - infeasible, breaking out of the search" << endl;
+        cont = false;
+        break;
     }
+    // stopping condition
+    if (rhs >= Globals::instance()->n() ||
+        ((status == OPTSTAT_MIPOPTIMAL || status == OPTSTAT_FEASIBLE) &&
+          x_cur->cost() == Globals::instance()->optimal())) {
+      cont = false;
+    }
+  }
 	
 	// from the back so the constraint re-numbering doesn't screw up the removal
 	for (int i = added_cons.size() - 1; i >= 0; --i) {
@@ -317,33 +358,38 @@ void LocalSearch::MIPMemetic(SolverStatus *final_status) {
 	// Generates first solution
 	int init_sol_time = 1, status = -1;
 	do {
-		solver_inten.Init();
+		solver_inten.Init(SolverOptions());
 
+    SolverOptions options;
+    options.set_max_time(init_sol_time);
+    options.set_only_first_solution(true);
 		sw->Start();
-		status = solver_inten.SolveTLAndUB(init_sol_time, Globals::Infinity(), true);
-        sw->Stop();
-        elapsed_time += sw->ElapsedMilliseconds;
-        sw->Reset();
+		status = solver_inten.Solve(options, NULL);
+    sw->Stop();
+    elapsed_time += sw->ElapsedMilliseconds;
+    sw->Reset();
 
 		init_sol_time *= 2;
 	}  while (status != OPTSTAT_FEASIBLE && status != OPTSTAT_MIPOPTIMAL);
 	solver_inten.GenerateSolution(&best_sol);
+
 	// for every element in the population, generates the first solution
 	for (int i = 0; i < params[POPULATION_SIZE]; ++i) {
 		int status = -1;
 		do {
 			cout << "Generating solution #" << i << endl;
 			//ConstructiveHeuristics::RandomStupid(*Globals::instance(), &pop->at(i));
-			solver_inten.Init();
+      SolverOptions options; options.set_max_time(10);
+			solver_inten.Init(options);
 
 			sw->Start();
-			status = solver_inten.SolveTLAndUB(10, Globals::Infinity());
+			status = solver_inten.Solve(options, NULL);
 			sw->Stop();
 			elapsed_time += sw->ElapsedMilliseconds;
 			sw->Reset();
-
 		} while (status != OPTSTAT_FEASIBLE && status != OPTSTAT_MIPOPTIMAL);
 		solver_inten.GenerateSolution(&pop->at(i));
+
 		cout << "Generating solution #" << i << " cost: " << pop->at(i).cost() << endl;
 		if (pop->at(i).cost() <= best_sol.cost()) {
 			best_sol = pop->at(i);

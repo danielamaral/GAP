@@ -29,6 +29,7 @@ public:
     /// Sets the capacity of 'machine'
     void set_capacity(int machine, int c);
     
+    int MinimumAssignmentCost() const;
     int AssignmentCost(int machine, const vector<int>& assignment) const;
     int AssignmentConsume(int machine, const vector<int>& assignment) const;
     const int* GetConsumeVector(int machine) const;
@@ -51,6 +52,7 @@ private:
     int m_;
     int n_;
     int optimal_;
+    int minimum_assignment_cost_;
 
     static const int kMaxMachines = 80;
     static const int kMaxTasks = 1600;

@@ -11,6 +11,8 @@ using namespace System::Diagnostics;
 #include "ConstructiveHeuristics.h"
 #include "Globals.h"
 #include "LocalSearch.h"
+#include "logging.h"
+#include "opt_cplex.h"
 #include "ProblemData.h"
 #include "ProblemDataLoader.h"
 #include "ProblemSolution.h"
@@ -18,62 +20,109 @@ using namespace System::Diagnostics;
 #include "SolverFormulacaoPadrao.h"
 #include "SolverGeracaoColunas.h"
 
-int main(int argc, char* argv[])
-{
-  const int kNumberArguments = 6;
-  if (argc < kNumberArguments) {
-      cout << "Error loading instance file, not enough command line arguments" << endl;
-      cout << "Usage: " << argv[0] << " INSTANCE_FILE RANDOM_SEED UPPER_BOUND ALGORITHM VERBOSE_LEVEL" << endl;
-      return 1;
+void ReadAndSolveMpsFile(const string& input_file) {
+  OPT_LP* lp = new OPT_CPLEX;
+  lp->readCopyMPS(const_cast<char*>(input_file.c_str()));
+  lp->setSimplexScreenLog(1);
+  const int kNumLpMethods = 7;
+  METHOD kMethodsToTry[kNumLpMethods] = {
+    METHOD_AUTOMATIC, METHOD_SIFTING, METHOD_PRIMAL, METHOD_CONCURRENT, METHOD_DUAL,
+    METHOD_BARRIERANDCROSSOVER, METHOD_BARRIERNOCROSSOVER };
+
+  OPTSTAT status;
+  for (int method = 0; method < kNumLpMethods; ++method) {
+    LOG(INFO) << "Trying method " << method << "...";
+    status = lp->optimize(kMethodsToTry[method]);
+    LOG(INFO) << "Method " << method << ": status " << status
+            << " obj " << lp->getObjVal();
+    if (status == OPTSTAT_LPOPTIMAL || status == OPTSTAT_MIPOPTIMAL)
+      break;
   }
+
+  delete lp;
+}
+
+int main(int argc, char* argv[]) {
+  google::InitGoogleLogging(argv[0]);
+
+  const int kNumberArguments = 7;
+  if (argc < kNumberArguments) {
+    LOG(ERROR) << "Usage: " << argv[0] << " "
+               << "INSTANCE_FILE SOLVER RANDOM_SEED UPPER_BOUND ALGORITHM MAX_TIME";
+    return argc;
+  }
+
 	string instance_file(argv[1]);
-	int random_seed = atoi(argv[2]);
-	int upper_bound = atoi(argv[3]);
-	string algorithm(argv[4]);
-	int verbosity = atoi(argv[5]);
+  string formulacao(argv[2]);
+	int random_seed = atoi(argv[3]);
+	int upper_bound = atoi(argv[4]);
+	string algorithm(argv[5]);
+  int max_time = atoi(argv[6]);
+
+  if (instance_file.find(".mps") != string::npos) {
+    ReadAndSolveMpsFile(instance_file);
+    return 0;
+  }
 
   Globals::rg()->RandomInit(random_seed);
-
+  VLOG(1) << "Loading instance file: " << instance_file;
   ProblemDataLoader loader(instance_file.c_str(), upper_bound, Globals::instance());
   loader.load();
-  cout << "Loading input..." << endl;
 
-	// Solver
-	//SolverFormulacaoPadrao solver(Globals::instance());
-  SolverGeracaoColunas solver(Globals::instance());
+  // Solver options
+  SolverOptions options;
+  options.set_max_time(max_time);
+  options.set_relative_time_for_first_solution(Globals::instance()->n() *
+                                               Globals::instance()->m());
+
+	// Solver and input options
+  Solver* solver;
+  SolverFactory* solver_factory;
+  if (formulacao == "GeracaoColunas") {
+    solver = new SolverGeracaoColunas(Globals::instance());
+    solver_factory = new SolverGeracaoColunasFactory();
+  } else if (formulacao == "FormulacaoPadrao") {
+    solver = new SolverFormulacaoPadrao(Globals::instance());
+    solver_factory = new SolverFormulacaoPadraoFactory();
+  } else {
+    LOG(FATAL) << "Inexistent formulation specified: " << formulacao;
+    return 2;
+  }
 
   // to keep the time
   Stopwatch^ sw = gcnew Stopwatch();
 
-	// final solution
-	ProblemSolution final_sol(Globals::instance());
-
-	// final status
+	// input options and final status
 	SolverStatus status;
 
 	if (algorithm == "CPLEX") {
 		sw->Start();
-		solver.Solve(60 * 60, &status);
+		solver->Init(options);
+		solver->Solve(options, &status);
+    solver->Solve(options, &status);
+    solver->Solve(options, &status);
 		sw->Stop();
 	} else if (algorithm == "CPLEX-UB") {
+    options.set_cut_off_value(upper_bound);
 		sw->Start();
-		SolverFormulacaoPadrao solver(Globals::instance());
-		solver.Init();
-		solver.Solve(60 * 60, &status);
+		solver->Init(options);
+		solver->Solve(options, &status);
 		sw->Stop();
 	} else if (algorithm == "VNSBra") {
+    options.set_time_for_first_solution(60);
 		sw->Start();
-		LocalSearch::VNSBra(60 * 60 * 1000, 120 * 1000, 5, &status);
+		LocalSearch::VNSBra(solver_factory, 60 * 60 * 1000, 120 * 1000, 5, &status);
 		sw->Stop();
-		//cout << final_sol.cost() << " " << static_cast<double>(sw->ElapsedMilliseconds) / 1000.0 << endl;
 	} else if (algorithm == "Memetic") {
 		sw->Start();
 		LocalSearch::MIPMemetic(&status);
 		sw->Stop();
-		//cout << final_sol.cost() << " " << static_cast<double>(sw->ElapsedMilliseconds) / 1000.0 << endl;
-	}
+  } else {
+    LOG(FATAL) << "Inexistent algorithm specified: " << algorithm;
+    return 3;
+  }
 
-	cout << status.ToString()<< endl;
+  status.time = sw->ElapsedMilliseconds / 1000.0;
+	LOG(INFO) << status.ToString();
 	return 0;
 }
-

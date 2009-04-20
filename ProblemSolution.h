@@ -57,7 +57,7 @@ public:
    /// A boolean vector with the tasks assigned to machine 'mac'
    void GetMachineAssignments(int mac, vector<bool>* assign) const;
    /// A boolean vector with the tasks assigned to machine 'mac'
-   void GetMachineAssignments(int mac, vector<int>* tasks) const;
+   void GetMachineAssignments(int mac, vector<short>* tasks) const;
    /// The number of different assignments between 2 solutions
    int Distance(const ProblemSolution& sol) const;
    /// Is this a valid assignment?

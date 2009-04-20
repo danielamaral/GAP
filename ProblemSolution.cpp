@@ -84,7 +84,7 @@ void ProblemSolution::GetMachineAssignments(int mac,
 }
 
 void ProblemSolution::GetMachineAssignments(int mac,
-                                            vector<int>* tasks) const {
+                                            vector<short>* tasks) const {
   tasks->clear();
   for (int i = 0; i < this->num_tasks(); ++i)
     if (this->assignment(i) == mac)

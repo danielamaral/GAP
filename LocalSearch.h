@@ -43,19 +43,20 @@ namespace LocalSearch {
 		int total_time,
 		ProblemSolution* final_sol);
 	void MultiEllipsoidalSearch();
+
 	// VNS, returns the total elapsed time in the method
-	uint64 VNSIntensification(
-		SolverFormulacaoPadrao *solver_intensification,
-		int max_opt,
-		int k_step,
-		int total_time_limit,
-		int node_time_limit,
-		ProblemSolution* x_cur);
-    void VNSBra(
-		int total_time_limit,
-		int node_time_limit,
-		int k_step,
-		SolverStatus* status);
+	uint64 VNSIntensification(VnsSolver *solver_intensification,
+                            int max_opt,
+                            int k_step,
+                            int total_time_limit,
+                            int node_time_limit,
+                            ProblemSolution* x_cur);
+
+  void VNSBra(SolverFactory* solver_factory,
+              int total_time_limit,
+              int node_time_limit,
+              int k_step,
+              SolverStatus* status);
 	// Tabu
 	void MIPTabuSearch(
 		ProblemSolution* sol);

@@ -10,15 +10,13 @@ using namespace std;
 
 class Column {
 public:
-  Column(int machine, int index, const vector<int>& tasks) :
+  Column(short machine, unsigned short index) :
       machine_(machine),
-      index_(index),
-      tasks_(tasks) {
+      index_(index) {
   }
 
   Column(const Column& c) {
     this->machine_ = c.machine();
-    this->tasks_ = c.tasks();
     this->index_ = c.index();
   }
 
@@ -28,19 +26,16 @@ public:
 
   void Clear() {
     this->machine_ = -1;
-    this->index_ = -1;
-    this->tasks_.clear();
+    this->index_ = 0;
   }
 
-  void set_index(int i) { index_ = i; }
-  int index() const { return index_; }
-  int machine() const { return machine_; }
-  const vector<int>& tasks() const { return tasks_; }
+  void set_index(short i) { index_ = i; }
+  unsigned short index() const { return index_; }
+  short machine() const { return machine_; }
 
 private:
-  vector<int> tasks_;
-  int machine_;
-  int index_;
+  short machine_;
+  unsigned short index_;
 };
 
 //Variables
@@ -187,8 +182,10 @@ public:
 /**
  * Type definition for the hash object.
  */
-typedef stdext::hash_map<
-  VariableGeracaoColunas, int, VariableGeracaoColunasHasher>
-VariableGeracaoColunasHash;
+
+//typedef stdext::hash_map<
+//  VariableGeracaoColunas, int, VariableGeracaoColunasHasher>
+//VariableGeracaoColunasContainer;
+typedef vector<VariableGeracaoColunas> VariableGeracaoColunasContainer;
 
 typedef std::pair<VariableGeracaoColunas, int> VariableGeracaoColunasIntPair;

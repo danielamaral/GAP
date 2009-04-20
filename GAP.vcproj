@@ -42,7 +42,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="&quot;C:\Documents and Settings\daniel\My Documents\GAP\Codigo\Random&quot;;C:\ILOG\CPLEX110\include\ilcplex;&quot;C:\Documents and Settings\daniel\My Documents\GAP\Codigo\OPT_LP\source&quot;;&quot;C:\Documents and Settings\daniel\My Documents\GAP\Codigo\OPT_LP\include&quot;"
+				AdditionalIncludeDirectories="&quot;C:\Users\Daniel\Documents\GAP\Codigo\glog-0.2\src\windows\glog&quot;;&quot;C:\Documents and Settings\daniel\My Documents\GAP\Codigo\Random&quot;;C:\ILOG\CPLEX110\include\ilcplex;&quot;C:\Documents and Settings\daniel\My Documents\GAP\Codigo\OPT_LP\source&quot;;&quot;C:\Documents and Settings\daniel\My Documents\GAP\Codigo\OPT_LP\include&quot;"
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;OPT_CPLEX_DEF;VERSAOCPLEX10"
 				MinimalRebuild="false"
 				BasicRuntimeChecks="0"
@@ -62,9 +62,9 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="cplex110.lib Random.lib"
+				AdditionalDependencies="cplex110.lib Random.lib libglog.lib"
 				LinkIncremental="2"
-				AdditionalLibraryDirectories="&quot;C:\Documents and Settings\daniel\My Documents\GAP\Codigo\Random\Debug&quot;;C:\ILOG\CPLEX110\lib\x86_.net2005_8.0\stat_mda"
+				AdditionalLibraryDirectories="&quot;C:\Users\Daniel\Documents\GAP\Codigo\glog-0.2\Release&quot;;&quot;C:\Documents and Settings\daniel\My Documents\GAP\Codigo\Random\Debug&quot;;C:\ILOG\CPLEX110\lib\x86_.net2005_8.0\stat_mda"
 				GenerateDebugInformation="true"
 				AssemblyDebug="1"
 				SubSystem="1"
@@ -119,9 +119,10 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
+				AdditionalOptions="/F134217728"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="C:\Users\Daniel\Documents\GAP\Codigo\Random;C:\ILOG\CPLEX110\include\ilcplex;C:\Users\Daniel\Documents\GAP\Codigo\OPT_LP\source;C:\Users\Daniel\Documents\GAP\Codigo\OPT_LP\include"
+				AdditionalIncludeDirectories="&quot;C:\Users\Daniel\Documents\GAP\Codigo\glog-0.2\src\windows\glog&quot;;C:\Users\Daniel\Documents\GAP\Codigo\Random;C:\ILOG\CPLEX110\include\ilcplex;C:\Users\Daniel\Documents\GAP\Codigo\OPT_LP\source;C:\Users\Daniel\Documents\GAP\Codigo\OPT_LP\include"
 				PreprocessorDefinitions="WIN32;_CONSOLE;OPT_CPLEX_DEF;VERSAOCPLEX10"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
@@ -140,9 +141,9 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="cplex110.lib Random.lib"
+				AdditionalDependencies="cplex110.lib Random.lib libglog.lib"
 				LinkIncremental="1"
-				AdditionalLibraryDirectories="C:\Users\Daniel\Documents\GAP\Codigo\Random\Release;C:\ILOG\CPLEX110\lib\x86_.net2005_8.0\stat_mda;C:\ILOG\CPLEX101\lib\x86_.net2005_8.0\stat_mda"
+				AdditionalLibraryDirectories="&quot;C:\Users\Daniel\Documents\GAP\Codigo\glog-0.2\Release&quot;;C:\Users\Daniel\Documents\GAP\Codigo\Random\Release;C:\ILOG\CPLEX110\lib\x86_.net2005_8.0\stat_mda;C:\ILOG\CPLEX101\lib\x86_.net2005_8.0\stat_mda"
 				GenerateDebugInformation="true"
 				SubSystem="1"
 				HeapReserveSize="0"
@@ -152,6 +153,84 @@
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
 				TargetMachine="1"
+			/>
+			<Tool
+				Name="VCALinkTool"
+			/>
+			<Tool
+				Name="VCManifestTool"
+			/>
+			<Tool
+				Name="VCXDCMakeTool"
+			/>
+			<Tool
+				Name="VCBscMakeTool"
+			/>
+			<Tool
+				Name="VCFxCopTool"
+			/>
+			<Tool
+				Name="VCAppVerifierTool"
+			/>
+			<Tool
+				Name="VCPostBuildEventTool"
+			/>
+		</Configuration>
+		<Configuration
+			Name="Profiling|Win32"
+			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
+			IntermediateDirectory="$(ConfigurationName)"
+			ConfigurationType="1"
+			CharacterSet="1"
+			ManagedExtensions="1"
+			>
+			<Tool
+				Name="VCPreBuildEventTool"
+			/>
+			<Tool
+				Name="VCCustomBuildTool"
+			/>
+			<Tool
+				Name="VCXMLDataGeneratorTool"
+			/>
+			<Tool
+				Name="VCWebServiceProxyGeneratorTool"
+			/>
+			<Tool
+				Name="VCMIDLTool"
+			/>
+			<Tool
+				Name="VCCLCompilerTool"
+				Optimization="2"
+				AdditionalIncludeDirectories="&quot;C:\Users\Daniel\Documents\GAP\Codigo\glog-0.2\src\windows\glog&quot;;&quot;C:\Documents and Settings\daniel\My Documents\GAP\Codigo\Random&quot;;C:\ILOG\CPLEX110\include\ilcplex;&quot;C:\Documents and Settings\daniel\My Documents\GAP\Codigo\OPT_LP\source&quot;;&quot;C:\Documents and Settings\daniel\My Documents\GAP\Codigo\OPT_LP\include&quot;"
+				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;OPT_CPLEX_DEF;VERSAOCPLEX10"
+				MinimalRebuild="false"
+				BasicRuntimeChecks="0"
+				RuntimeLibrary="3"
+				UsePrecompiledHeader="0"
+				WarningLevel="3"
+				DebugInformationFormat="3"
+			/>
+			<Tool
+				Name="VCManagedResourceCompilerTool"
+			/>
+			<Tool
+				Name="VCResourceCompilerTool"
+			/>
+			<Tool
+				Name="VCPreLinkEventTool"
+			/>
+			<Tool
+				Name="VCLinkerTool"
+				AdditionalDependencies="cplex110.lib Random.lib libglog.lib"
+				LinkIncremental="2"
+				AdditionalLibraryDirectories="&quot;C:\Users\Daniel\Documents\GAP\Codigo\glog-0.2\Release&quot;;&quot;C:\Documents and Settings\daniel\My Documents\GAP\Codigo\Random\Debug&quot;;C:\ILOG\CPLEX110\lib\x86_.net2005_8.0\stat_mda"
+				GenerateDebugInformation="true"
+				AssemblyDebug="1"
+				SubSystem="1"
+				StackReserveSize="10485760"
+				TargetMachine="1"
+				Profile="true"
 			/>
 			<Tool
 				Name="VCALinkTool"
@@ -338,6 +417,14 @@
 						Name="VCCLCompilerTool"
 						CompileAsManaged="0"
 						CompileAs="1"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Profiling|Win32"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+						CompileAsManaged="0"
 					/>
 				</FileConfiguration>
 			</File>

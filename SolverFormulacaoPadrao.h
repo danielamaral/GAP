@@ -9,48 +9,18 @@
 #include "ProblemSolution.h"
 #include "VariableFormulacaoPadrao.h"
 
-class SolverStatus {
-public:
-	SolverStatus() : status(-1), final_sol(Globals::instance()),
-		gap_relative(0.0), gap_absolute(0.0), time (0.0) { }
-
-	string ToString() {
-		stringstream ss;
-		ss << final_sol.cost() << " ";
-		if (str_status != "heuristic")
-			ss << gap_relative << " " << gap_absolute << " ";
-		ss << time << " " << str_status;
-		return ss.str();
-	}
-	int status;
-	string str_status;
-
-	ProblemSolution final_sol;
-	
-	double gap_relative;
-	double gap_absolute;
-
-	double time;
-};
-
-class SolverFormulacaoPadrao : public Solver {
+class SolverFormulacaoPadrao : public VnsSolver {
 public:
   SolverFormulacaoPadrao(ProblemData* problem_data);
   ~SolverFormulacaoPadrao();
   /// Solves the problem
-  int Solve() { return Solve(60); }
-  int Solve(int time_limit);
-	void Solve(int time_limit, SolverStatus* status);
-	
-	int SolveTLAndUB(int time_limit, double upper_bound, bool first = false);
-	void SolveTLAndUB(int time_limit, double upper_bound,
-    bool first, SolverStatus* status);
+	int Solve(const SolverOptions& options, SolverStatus* status);
 
 	double GetGapRelative();
 	double GetGapAbsolute();
 
   /// Initializes the problem (creates variables and constraints)
-  void Init();
+  void Init(const SolverOptions& options);
 
   /// Generates a ProblemSolution from the output of the solver.
   void GenerateSolution(ProblemSolution* ps);
@@ -70,8 +40,8 @@ public:
   int AddConsMinAssignmentChanges(const ProblemSolution& sol, int num_changes);
   
   // Adds a constraint that determines that one of the assignments with
-  //negative reduced cost has to enter the basis:
-  //sum(X_ij with negative cost) >= 1
+  // negative reduced cost has to enter the basis:
+  // sum(X_ij with negative cost) >= 1
   int AddConsIntegerSolutionStrongCuttingPlane(const ProblemSolution& sol);
 
   // Removes the constraint <cons_row>
@@ -90,10 +60,14 @@ public:
   // variáveis duais no problema relaxado (a.k.a. a relaxação linear do
   // problema).
   static void GetRelaxedDualValues(const ProblemData& p, vector<double>* dual);
-  static void GetFirstIntegerSolution(const ProblemData& p,
-                                      ProblemSolution* sol);
+  static OPTSTAT GetFirstIntegerSolution(const ProblemData& p,
+                                         ProblemSolution* sol);
+  static OPTSTAT SolverFormulacaoPadrao::GetIntegerSolutionWithTimeLimit(
+      const ProblemData& p, int time_limit, ProblemSolution* sol);
 
 private:
+	int SolveTLAndUB(int time_limit, double upper_bound, bool first = false);
+
   /********************************************************************
   **                     VARIABLE CREATION                           **
   *********************************************************************/
@@ -137,4 +111,17 @@ private:
 
   /** Hash which associates the row number with the Constraint object. */
   ConstraintFormulacaoPadraoHash cHash_;
+};
+
+
+class SolverFormulacaoPadraoFactory : public SolverFactory {
+ public:
+  SolverFormulacaoPadraoFactory() {}
+  ~SolverFormulacaoPadraoFactory() {}
+  Solver* NewSolver(ProblemData* problem_data) {
+    return new SolverFormulacaoPadrao(problem_data);
+  }
+  VnsSolver* NewVnsSolver(ProblemData* problem_data) {
+    return new SolverFormulacaoPadrao(problem_data);
+  }
 };

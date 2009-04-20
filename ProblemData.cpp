@@ -1,8 +1,8 @@
 #include "ProblemData.h"
 
-#include <cassert>
+#include "logging.h"
 
-ProblemData::ProblemData() : m_(0), n_(0)
+ProblemData::ProblemData() : m_(0), n_(0), minimum_assignment_cost_(0)
 {
 }
 
@@ -13,15 +13,16 @@ ProblemData::~ProblemData(void)
 
 void ProblemData::clear() {
     m_ = n_ = 0;
+    minimum_assignment_cost_ = 0;
 }
 
 void ProblemData::set_m(int x) {
-    assert(x <= kMaxMachines);
+    DCHECK(x <= kMaxMachines);
     m_ = x;
 }
 
 void ProblemData::set_n(int x) {
-    assert(x <= kMaxTasks);
+    DCHECK(x <= kMaxTasks);
     n_ = x;
 }
 
@@ -42,39 +43,40 @@ int ProblemData::num_tasks() const {
 }
 
 void ProblemData::set_cost(int machine, int task, int c) {
-    assert(machine < m_);
-    assert(task < n_);
-    assert(c >= 0);
+    DCHECK(machine < m_);
+    DCHECK(task < n_);
+    DCHECK(c >= 0);
     cost_[machine][task] = c;
+    minimum_assignment_cost_ = min<int>(minimum_assignment_cost_, c);
 }
 
 int ProblemData::cost(int machine, int task) const {
-    assert(machine < m_);
-    assert(task < n_);
+    DCHECK(machine < m_);
+    DCHECK(task < n_);
     return cost_[machine][task];
 }
 
 void ProblemData::set_consume(int machine, int task, int c) {
-    assert(machine < m_);
-    assert(task < n_);
-    assert(c >= 0);
+    DCHECK(machine < m_);
+    DCHECK(task < n_);
+    DCHECK(c >= 0);
     consume_[machine][task] = c;
 }
 
 int ProblemData::consume(int machine, int task) const {
-    assert(machine < m_);
-    assert(task < n_);
+    DCHECK(machine < m_);
+    DCHECK(task < n_);
     return consume_[machine][task];
 }
 
 void ProblemData::set_capacity(int machine, int c) {
-    assert(machine < m_);
-    assert(c >= 0);
+    DCHECK(machine < m_);
+    DCHECK(c >= 0);
     capacity_[machine] = c;
 }
 
 int ProblemData::capacity(int machine) const {
-    assert(machine < m_);
+    DCHECK(machine < m_);
     return capacity_[machine];
 }
 
@@ -101,6 +103,10 @@ int ProblemData::AssignmentConsume(int machine, const vector<int>& assignment) c
       consume += this->consume(machine, t);
   }
   return consume;
+}
+
+int ProblemData::MinimumAssignmentCost() const {
+  return minimum_assignment_cost_;
 }
 
 const int* ProblemData::GetConsumeVector(int machine) const {

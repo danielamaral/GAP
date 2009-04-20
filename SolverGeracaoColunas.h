@@ -4,6 +4,10 @@
 #include <sstream>
 #include <vector>
 
+#include <vcclr.h>
+#using <System.dll>
+using namespace System::Diagnostics;
+
 #include "solver.h"
 #include "opt_lp.h"
 #include "ConstraintGeracaoColunas.h"
@@ -13,7 +17,8 @@
 
 using namespace std;
 
-class SolverStatus;
+class SolverGeracaoColunas;
+class SolverGeracaoColunasFactory;
 
 class FixingCandidate {
 public:
@@ -30,66 +35,83 @@ public:
   double value;
 };
 
-class SolverGeracaoColunas : public Solver {
-public:
+class SolverGeracaoColunas : public VnsSolver {
+ public:
   SolverGeracaoColunas(ProblemData* problem_data);
   ~SolverGeracaoColunas();
 
   /********************************************************************
   **                SOLVING AND RESULTS METHODS                      **
   *********************************************************************/
-
-  int Solve();
-	void Solve(int time_limit, SolverStatus* status);	
-	void SolveWithCutoff(int time_limit, double cutoff,
-                       bool first, SolverStatus* status);
-	OPTSTAT SolveWithCutoff(int time_limit, double cutoff, bool first = false);
-	double GetGapRelative();
-	double GetGapAbsolute();
+	int Solve(const SolverOptions& options, SolverStatus* status);
+  
+  /// Initializes the problem (creates variables and constraints)
+  void Init(const SolverOptions& options);
 
   /// Generates a ProblemSolution from the X vector
   void GenerateSolution(const ProblemData& p,
-                        const VariableGeracaoColunasHash& vHash,
+                        const VariableGeracaoColunasContainer& vContainer,
                         const OPT_LP& lp,
                         ProblemSolution* sol) const;
 
   /********************************************************************
   **                 LOCAL SEARCH CONSTRAINTS                        **
   *********************************************************************/
+  // Adds a constraint: delta(x, sol) <= num_changes
+  virtual int AddConsMaxAssignmentChanges(const ProblemSolution& sol,
+                                          int num_changes);
+  
+  // Adds a constraint: delta(x, sol) >= num_changes
+  virtual int AddConsMinAssignmentChanges(const ProblemSolution& sol,
+                                          int num_changes);
+  
+  // Removes the constraint <cons_row> or the range [cons_row_begin, cons_row_end]
+  virtual void RemoveConstraint(int cons_row);
+  virtual void RemoveConstraint(int cons_row_begin, int cons_row_end);
+  
+  // Changes the sense of the constraint <cons_row> and updates the RHS side to <rhs>
+  virtual void ReverseConstraint(int cons_row, double rhs);
 
 
 private:
   /********************************************************************
   **                       UTILITY METHODS                           **
   *********************************************************************/
-
-  /// Initializes the problem (creates variables and constraints)
-  void SetUpCplexParams(OPT_LP* lp);
+  /// If the time to solve the problem has expired.
+  bool TimeExpired() const;
 
   /// Generates a Xij matrix from the given fractionary solution
   void GetXijMatrix(const vector<double>& current_sol,
-                    const VariableGeracaoColunasHash& vHash,
+                    const VariableGeracaoColunasContainer& vContainer,
                     vector<vector<double> >* x) const;
+
+  /// Utility functions to deal with the mapping of column indices to task lists.
+  void AddTasksToColumnMap(int column_index, const vector<short>& tasks);
+  const vector<short>& GetColumnTasks(int column_index) const;
+  void RemoveColumnTasksFromMap(int column_index);
 
   /********************************************************************
   **             VARIABLE CREATION + STABILIZATION                   **
   *********************************************************************/
 
-  void AddNewColumn(double cost, double lower_bound, double upper_bound,
-                    int machine, const vector<int>& tasks,
-                    VariableGeracaoColunasHash* vHash, OPT_LP* lp);
+  void AddNewColumnWithTasks(double cost, double lower_bound, double upper_bound,
+                             int machine, const vector<short>& tasks,
+                             VariableGeracaoColunasContainer* vContainer, OPT_LP* lp);
 
-  void AddNewColumn(const VariableGeracaoColunas& var,
-                    double lower_bound, double upper_bound, 
-                    VariableGeracaoColunasHash* vHash, OPT_LP* lp);
+  void AddNewColumnReuseTasks(const VariableGeracaoColunas& var,
+                              double lower_bound, double upper_bound,
+                              VariableGeracaoColunasContainer* vContainer, OPT_LP* lp);
 
   void AddStabilizationColumnsWithCoeficients(
       const ProblemData& p, const vector<double>& relaxed_dual_values,
-      VariableGeracaoColunasHash* vHash, OPT_LP* lp);
+      VariableGeracaoColunasContainer* vContainer, OPT_LP* lp);
+
+  OPTSTAT AddInitialColumns(bool first, int time_limit,
+                            ProblemSolution* integer_solution);
 
   void AddIntegerSolutionColumnsWithCoeficients(
       const ProblemData& p, const ProblemSolution& integer_solution,
-      VariableGeracaoColunasHash* vHash, OPT_LP* lp);
+      VariableGeracaoColunasContainer* vContainer, OPT_LP* lp);
 
   /********************************************************************
   **                    CONSTRAINT CREATION                          **
@@ -102,6 +124,14 @@ private:
   /********************************************************************
   **                   COLUMN GENERATION METHODS                     **
   *********************************************************************/
+  void AdjustStabilizationBounds(
+    const ProblemData& p, double bound,
+    const VariableGeracaoColunasContainer& vContainer, OPT_LP* lp);
+
+  void UpdateStabilizationCosts(
+    const ProblemData& p, const vector<double>& dual_values, 
+    VariableGeracaoColunasContainer* vContainer, OPT_LP* lp);
+
   double GenerateColumnsWithStabilization(const ProblemData& p,
                                           OPT_LP* lp,
                                           int* num_columns,
@@ -116,7 +146,7 @@ private:
 
   void RemoveExcessColumns(const ProblemData& pd,
                            int num_columns_to_remove,
-                           VariableGeracaoColunasHash* vHash,
+                           VariableGeracaoColunasContainer* vContainer,
                            OPT_LP* lp);
 
   /********************************************************************
@@ -154,7 +184,7 @@ private:
       vector<vector<short> >* fixed, vector<short>* before_fixing);
 
   bool ShouldRemoveColumnWhenFixing(
-      FixingSense sense, const VariableGeracaoColunas& var,
+      FixingSense sense, const VariableGeracaoColunas& var, int column_number,
       int fixed_machine, int fixed_task);
 
   double FixVariableAndContinueBB(
@@ -177,15 +207,38 @@ private:
   double EvaluateVariableToFix(double binary_var);
 
   OPT_LP* lp_;
-  int num_pivo_;
+  int total_num_nodes_;
   int column_count_;
+  bool stabilize_column_generation_;
+  bool has_generated_initial_columns_;
+
+  /** Some interesting statistics from the solving */
+  double root_lower_bound_;
+  int node_with_best_result_;
+
+  /** Internal variables to control the time limits */
+  gcroot<Stopwatch ^> stopwatch_;
+  uint64 time_limit_in_milliseconds_;
 
   /** Hash which associates the column number with the Variable object. */
-  VariableGeracaoColunasHash vHash_;
+  VariableGeracaoColunasContainer vContainer_;
+  map<int, vector<short> > column_map_;
 
   /** Hash which associates the row number with the Constraint object. */
   ConstraintGeracaoColunasHash cHash_;
 
   static const int kMaxNumberColumns_ = 40000;
   static const int kNumColumnsToRemove_ = 10000;
+};
+
+class SolverGeracaoColunasFactory : public SolverFactory {
+ public:
+  SolverGeracaoColunasFactory() {}
+  ~SolverGeracaoColunasFactory() {}
+  Solver* NewSolver(ProblemData* problem_data) {
+    return new SolverGeracaoColunas(problem_data);
+  }
+  VnsSolver* NewVnsSolver(ProblemData* problem_data) {
+    return new SolverGeracaoColunas(problem_data);
+  }
 };

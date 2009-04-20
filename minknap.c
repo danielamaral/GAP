@@ -218,7 +218,7 @@ void errorx(char *str, ...)
 
 void pfree(void *p)
 {
-  if (p == NULL) errorx("freeing null");
+  //if (p == NULL) errorx("freeing null");
   free(p);
 }
 
@@ -228,9 +228,9 @@ void *palloc(long size)
   char *p;
 
   if (size == 0) size = 1;
-  if (size != (size_t) size) errorx("Alloc too big %ld", size);
+  //if (size != (size_t) size) errorx("Alloc too big %ld", size);
   p = (char*) malloc(size);
-  if (p == NULL) errorx("no memory size %ld", size);
+  //if (p == NULL) errorx("no memory size %ld", size);
   return p;
 }
 
@@ -674,10 +674,11 @@ void reduceset(allinfo *a)
 
 void initfirst(allinfo *a, stype ps, stype ws)
 {
+  static state mem[MAXSTATES];
   register state *k;
 
   a->d.size  = 1;
-  a->d.set1  = (state*) palloc(MAXSTATES * sizeof(state));
+  a->d.set1  = mem;//(state*) palloc(MAXSTATES * sizeof(state));
   a->d.setm  = a->d.set1 + MAXSTATES - 1;
   a->d.fset  = a->d.set1;
   a->d.lset  = a->d.set1;
@@ -755,15 +756,19 @@ void findbreak(allinfo *a)
 /* ======================================================================
 				minknap
    ====================================================================== */
-
+//static int KNAPSIZE = 20000;
+#define KNAPSIZE 20000
 stype minknap(int n, int *p, int *w, int *x, int c)
 {
   allinfo a;
-  item *tab;
-  interval *inttab;
+  item* tab;//[KNAPSIZE];
+  static item tabmem[KNAPSIZE];
+  interval* inttab;//[KNAPSIZE];
+  static interval inttabmem[SORTSTACK];
 
   /* allocate space for internal representation */
-  tab = (item *) palloc(sizeof(item) * n);
+  //tab = (item *) palloc(sizeof(item) * n);
+  tab = tabmem;//(item *) palloc(sizeof(item) * n);
   a.fitem = &tab[0]; a.litem = &tab[n-1];
   copyproblem(a.fitem, a.litem, p, w, x);
   a.n           = n;
@@ -776,7 +781,8 @@ stype minknap(int n, int *p, int *w, int *x, int c)
   a.maxstates   = 0;
   a.coresize    = 0;
 
-  inttab  = (interval*) palloc(sizeof(interval) * SORTSTACK);
+  //inttab  = (interval*) palloc(sizeof(interval) * SORTSTACK);
+  inttab  = inttabmem;
   a.intv1 = a.intv1b = &inttab[0];
   a.intv2 = a.intv2b = &inttab[SORTSTACK - 1];
   a.fsort = a.litem; a.lsort = a.fitem;
@@ -807,13 +813,13 @@ stype minknap(int n, int *p, int *w, int *x, int c)
       }
       reduceset(&a);
     }
-    pfree(a.d.set1);
+    //pfree(a.d.set1);
 
     definesolution(&a);
     if (a.welldef) break;
   }
-  pfree(tab);
-  pfree(inttab);
+  //pfree(tab);
+  //pfree(inttab);
   return a.zstar;
 }
 

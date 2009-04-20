@@ -28,10 +28,16 @@ VariableGeracaoColunas::~VariableGeracaoColunas() {
 VariableGeracaoColunas& VariableGeracaoColunas::operator=(const VariableGeracaoColunas& var) {
 	type_ = var.type();
   machine_ = var.machine();
-  task_ = var.task();
-  column_ = var.column();
-  value_ = var.value();
-  reducedcost_ = var.reducedcost();
+  if (type_ != COL) {
+    task_ = var.task();
+    column_.Clear();
+  } else {
+    column_ = var.column();
+    task_ = -1;
+  }
+  //value_ = var.value();
+  //reducedcost_ = var.reducedcost();
+  cost_ = var.cost();
 	return *this;
 }
 
@@ -59,11 +65,6 @@ bool VariableGeracaoColunas::operator <(const VariableGeracaoColunas& var) const
     if (this->column().machine() < var.column().machine())
       return true;
     else if (this->column().machine() > var.column().machine())
-      return false;
-
-    if (this->column().tasks() < var.column().tasks())
-      return true;
-    else if (this->column().tasks() > var.column().tasks())
       return false;
 
     if (this->column().index() < var.column().index())

@@ -6,8 +6,8 @@
 #include "opt_cplex.h"
 #include "ProblemData.h"
 
-SolverFormulacaoPadrao::SolverFormulacaoPadrao(ProblemData* problem_data) :
-  Solver(problem_data) {
+SolverFormulacaoPadrao::SolverFormulacaoPadrao(ProblemData* problem_data):
+    VnsSolver(problem_data) {
     lp_ = new OPT_CPLEX;
     log_.open((wchar_t*)"log", std::ofstream::out);
 }
@@ -233,34 +233,34 @@ int SolverFormulacaoPadrao::AddConsMaxAssignmentChanges(const ProblemSolution& s
 	// the right hand side
 	int rhs = problem_data_->n() - num_changes;
 
-    int cons_row = lp_->getNumRows();
-    int nnz = problem_data_->n();
-    OPT_ROW row(nnz, OPT_ROW::GREATER, rhs, (char*) "ConsMaxAssignmentChanges");
-    lp_->addRow(row);
+  int cons_row = lp_->getNumRows();
+  int nnz = problem_data_->n();
+  OPT_ROW row(nnz, OPT_ROW::GREATER, rhs, (char*) "ConsMaxAssignmentChanges");
+  lp_->addRow(row);
 
-    // for each task
-    for (int i = 0; i < problem_data_->n(); ++i) {
-		  SetVariable(cons_row, i, sol.assignment(i), 1.0);
-    }
+  // for each task
+  for (int i = 0; i < problem_data_->n(); ++i) {
+	  SetVariable(cons_row, i, sol.assignment(i), 1.0);
+  }
 
-    return cons_row;
+  return cons_row;
 }
 
 int SolverFormulacaoPadrao::AddConsMinAssignmentChanges(const ProblemSolution& sol, int num_changes) {
 	// the right hand side
 	int rhs = problem_data_->n() - num_changes;
 
-    int cons_row = lp_->getNumRows();
-    int nnz = problem_data_->n();
-    OPT_ROW row(nnz, OPT_ROW::LESS, rhs, (char*) "ConsMinAssignmentChanges");
-    lp_->addRow(row);
+  int cons_row = lp_->getNumRows();
+  int nnz = problem_data_->n();
+  OPT_ROW row(nnz, OPT_ROW::LESS, rhs, (char*) "ConsMinAssignmentChanges");
+  lp_->addRow(row);
 
-    // for each task
-    for (int i = 0; i < problem_data_->n(); ++i) {
-		  SetVariable(cons_row, i, sol.assignment(i), 1.0);
-    }
+  // for each task
+  for (int i = 0; i < problem_data_->n(); ++i) {
+	  SetVariable(cons_row, i, sol.assignment(i), 1.0);
+  }
 
-    return cons_row;
+  return cons_row;
 }
 
 int SolverFormulacaoPadrao::AddConsIntegerSolutionStrongCuttingPlane(const ProblemSolution& sol) {
@@ -321,13 +321,18 @@ void SolverFormulacaoPadrao::GenerateSolution(ProblemSolution* sol) {
   assert(sol->IsValid());
 }
 
-void SolverFormulacaoPadrao::Init() {
+void SolverFormulacaoPadrao::Init(const SolverOptions& options) {
   /** creates the problem */
   lp_->createLP("FormulacaoPadrao", OPTSENSE_MINIMIZE, PROB_MIP);
   lp_->setMIPScreenLog(0);
   lp_->setMIPEmphasis(0);
   lp_->setMIPRelTol(0.00);
 	lp_->setMIPAbsTol(0.00);
+  
+  // Maximum 1.5 gigs, store the rest on disk (uncompressed).
+  lp_->setWorkMem(1200);
+  lp_->setTreLim(1500);
+  lp_->setNodeFileInd(2);
 
   /** creates the variables */
   CreateVarTaskAssignment(*problem_data_, OPT_COL::VAR_BINARY, &vHash_, lp_);
@@ -337,19 +342,9 @@ void SolverFormulacaoPadrao::Init() {
   CreateConsOneMachinePerTask(*problem_data_, &vHash_, &cHash_, lp_);
 }
 
-void SolverFormulacaoPadrao::SolveTLAndUB(int time_limit, double upper_bound,
-                                          bool first, SolverStatus* status) {
-	status->status = SolveTLAndUB(time_limit, upper_bound, first);
-	status->gap_absolute = GetGapAbsolute();
-	status->gap_relative = GetGapRelative();
-	if (status->status == OPTSTAT_FEASIBLE || status->status == OPTSTAT_MIPOPTIMAL)
-		GenerateSolution(&status->final_sol);
-}
-
 /* static */ void SolverFormulacaoPadrao::GetRelaxedDualValues(
-  const ProblemData& p,
-  vector<double>* dual) {
-  
+    const ProblemData& p,
+    vector<double>* dual) {
   OPT_LP* lp = new OPT_CPLEX;
   VariableFormulacaoPadraoHash vHash;
   ConstraintFormulacaoPadraoHash cHash;
@@ -362,10 +357,11 @@ void SolverFormulacaoPadrao::SolveTLAndUB(int time_limit, double upper_bound,
   lp->optimize(METHOD_DUAL);
 
   dual->resize(lp->getNumRows());
-  lp->getPi(static_cast<double*>(&(dual->at(0))));
+  lp->getPi(&(*dual)[0]);
+  delete lp;
 }
 
-/* static */ void SolverFormulacaoPadrao::GetFirstIntegerSolution(
+/* static */ OPTSTAT SolverFormulacaoPadrao::GetFirstIntegerSolution(
   const ProblemData& p,
   ProblemSolution* sol) {
   
@@ -382,15 +378,67 @@ void SolverFormulacaoPadrao::SolveTLAndUB(int time_limit, double upper_bound,
   lp->optimize(METHOD_MIP);
 
   GenerateSolution(lp, &vHash, &cHash, sol);
+  OPTSTAT status = lp->getStat();
+  delete lp;
+  return status;
+}
+
+/* static */ OPTSTAT SolverFormulacaoPadrao::GetIntegerSolutionWithTimeLimit(
+  const ProblemData& p,
+  int time_limit,
+  ProblemSolution* sol) {
+  
+  OPT_LP* lp = new OPT_CPLEX;
+  VariableFormulacaoPadraoHash vHash;
+  ConstraintFormulacaoPadraoHash cHash;
+
+  lp->createLP("FormulacaoPadraoFirstInteger", OPTSENSE_MINIMIZE, PROB_MIP);
+  CreateVarTaskAssignment(p, OPT_COL::VAR_BINARY, &vHash, lp);
+  CreateConsMachineCapacity(p, &vHash, &cHash, lp);
+  CreateConsOneMachinePerTask(p, &vHash, &cHash, lp);
+
+  //lp->setMIPScreenLog(3);
+  // Maximum 1.5 gigs, store the rest on disk (uncompressed).
+  lp->setWorkMem(1100);
+  lp->setTreLim(1500);
+  lp->setNodeFileInd(2);
+
+  if (time_limit > 0)
+    lp->setTimeLimit(time_limit);
+  lp->optimize(METHOD_MIP);
+
+  if (lp->getStat() != OPTSTAT_FEASIBLE) {
+    lp->setNumIntSols(1);
+    lp->optimize(METHOD_MIP);
+  }
+
+  GenerateSolution(lp, &vHash, &cHash, sol);
+  OPTSTAT status = lp->getStat();
+  delete lp;
+  return status;
+}
+
+int SolverFormulacaoPadrao::Solve(const SolverOptions& options,
+                                  SolverStatus* output_status) {
+  int status = SolveTLAndUB(options.max_time(),
+                            options.cut_off_value(), options.only_first_solution());
+  if (output_status != NULL) {
+    output_status->status = status;
+    output_status->gap_absolute = GetGapAbsolute();
+    output_status->gap_relative = GetGapRelative();
+    if (status == OPTSTAT_FEASIBLE || status == OPTSTAT_MIPOPTIMAL)
+	    GenerateSolution(&output_status->final_sol);
+  }
+  return status;
 }
 
 int SolverFormulacaoPadrao::SolveTLAndUB(int time_limit, double upper_bound, bool first) {
 	/** sets lp parameters */
   lp_->writeProbLP("SolverFormulacaoPadrao");
-  lp_->setTimeLimit(time_limit);
 	//lp_->setVarSel(3);
-
-	lp_->setTimeLimit(time_limit);
+  //cout << "Time: " << time_limit;
+  if (time_limit > 0)
+	  lp_->setTimeLimit(time_limit);
 
 	if (upper_bound < Globals::Infinity())
 		lp_->setMIPCutOff(upper_bound);
@@ -400,7 +448,7 @@ int SolverFormulacaoPadrao::SolveTLAndUB(int time_limit, double upper_bound, boo
     else
         lp_->setNumIntSols(0);  // maximum number
 
-    /** solves the problem */
+  /** solves the problem */
 	return lp_->optimize(METHOD_MIP);
 }
 
@@ -410,12 +458,4 @@ double SolverFormulacaoPadrao::GetGapRelative() {
 
 double SolverFormulacaoPadrao::GetGapAbsolute() {
 	return lp_->getMIPAbsGap();
-}
-
-int SolverFormulacaoPadrao::Solve(int time_limit) {
-	return SolveTLAndUB(time_limit, Globals::Infinity());
-}
-
-void SolverFormulacaoPadrao::Solve(int time_limit, SolverStatus* status) {
-	SolveTLAndUB(time_limit, Globals::Infinity(), false, status);
 }
