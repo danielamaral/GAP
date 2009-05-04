@@ -35,4 +35,9 @@ private:
   static double BigEpsilon_;
 };
 
+enum FixingSense {
+  FIX_ON_ZERO = 0,
+  FIX_ON_ONE
+};
+
 #endif

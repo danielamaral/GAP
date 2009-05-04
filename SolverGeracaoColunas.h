@@ -14,6 +14,7 @@ using namespace System::Diagnostics;
 #include "Globals.h"
 #include "ProblemSolution.h"
 #include "VariableGeracaoColunas.h"
+#include "VnsCut.h"
 
 using namespace std;
 
@@ -35,6 +36,7 @@ public:
   double value;
 };
 
+
 class SolverGeracaoColunas : public VnsSolver {
  public:
   SolverGeracaoColunas(ProblemData* problem_data);
@@ -53,6 +55,7 @@ class SolverGeracaoColunas : public VnsSolver {
                         const VariableGeracaoColunasContainer& vContainer,
                         const OPT_LP& lp,
                         ProblemSolution* sol) const;
+  void GenerateSolution(ProblemSolution* sol);
 
   /********************************************************************
   **                 LOCAL SEARCH CONSTRAINTS                        **
@@ -70,8 +73,7 @@ class SolverGeracaoColunas : public VnsSolver {
   virtual void RemoveConstraint(int cons_row_begin, int cons_row_end);
   
   // Changes the sense of the constraint <cons_row> and updates the RHS side to <rhs>
-  virtual void ReverseConstraint(int cons_row, double rhs);
-
+  virtual void ReverseConstraint(int cons_row, int rhs);
 
 private:
   /********************************************************************
@@ -89,6 +91,9 @@ private:
   void AddTasksToColumnMap(int column_index, const vector<short>& tasks);
   const vector<short>& GetColumnTasks(int column_index) const;
   void RemoveColumnTasksFromMap(int column_index);
+
+  // Function that correctly sets the final status based on the previous and the found.
+  void SetStatus(const OPTSTAT& previous, const OPTSTAT& current, OPTSTAT* final);
 
   /********************************************************************
   **             VARIABLE CREATION + STABILIZATION                   **
@@ -154,6 +159,8 @@ private:
   *********************************************************************/
   OPTSTAT SetUpAndRunBranchAndBound(const ProblemData& p,
                                     int num_nodes_limit,
+                                    double cut_off_value,
+                                    bool first_only,
                                     OPT_LP* lp,
                                     ProblemSolution* integer_solution);
 
@@ -162,6 +169,8 @@ private:
             int num_nodes_limit,
             int depth,
             double lower_bound,
+            double cut_off_value,
+            bool first_only,
             OPT_LP* lp,
             ProblemSolution* best_solution,
             vector<vector<short> >* fixed_vars,
@@ -174,11 +183,6 @@ private:
   // o branch and bound. Elas armazenam o estado, fazem as modificações
   // necessárias nas colunas e chamam o BB. Depois que o BB retorna, elas
   // retornam as colunas e a matriz 'fixed_vars' ao seu estado original.
-  enum FixingSense {
-    FIX_ON_ZERO = 0,
-    FIX_ON_ONE
-  };
-
   void SetAndStoreFixedVariables(
       FixingSense sense, const ProblemData& p, int fixed_machine, int fixed_task,
       vector<vector<short> >* fixed, vector<short>* before_fixing);
@@ -189,7 +193,8 @@ private:
 
   double FixVariableAndContinueBB(
     FixingSense fixing_sense, int fixed_machine, int fixed_task,
-    int num_nodes_limit, double lower_bound, const ProblemData& p,
+    int num_nodes_limit, double lower_bound, double cut_off_value,
+    bool first_only, const ProblemData& p,
     OPT_LP* lp, ProblemSolution* best_solution,
     vector<vector<short> >* fixed_vars,
     int* num_columns, int depth, double* pct_tree_solved,
@@ -199,7 +204,7 @@ private:
   // a serem fixadas. Depois pega essas candidatas e submete a um
   // rápido ("raso") BB para escolher a que gera o melhor lower bound.
   int SelectFixedVariable(const ProblemData& p, int num_vars_lookup,
-                          const vector<vector<double> >& x, OPT_LP* lp,
+                          const vector<vector<double> >& x, double cut_off, OPT_LP* lp,
                           ProblemSolution* best_solution,
                           vector<vector<short> >* fixed_vars, int* num_columns,
                           int* fixed_machine, int* fixed_task);
@@ -226,6 +231,9 @@ private:
 
   /** Hash which associates the row number with the Constraint object. */
   ConstraintGeracaoColunasHash cHash_;
+
+  /** Structure that keeps the added VNS constraints */
+  vector<VnsCut> vns_cuts_;
 
   static const int kMaxNumberColumns_ = 40000;
   static const int kNumColumnsToRemove_ = 10000;

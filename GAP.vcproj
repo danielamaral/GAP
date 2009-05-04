@@ -500,6 +500,14 @@
 				RelativePath=".\VariableGeracaoColunas.h"
 				>
 			</File>
+			<File
+				RelativePath=".\VnsCut.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\VnsCut.h"
+				>
+			</File>
 		</Filter>
 		<File
 			RelativePath=".\ReadMe.txt"

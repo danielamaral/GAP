@@ -221,7 +221,7 @@ void SolverFormulacaoPadrao::RemoveConstraint(int cons_row_begin, int cons_row_e
     lp_->delRows(cons_row_begin, cons_row_end);
 }
 
-void SolverFormulacaoPadrao::ReverseConstraint(int cons_row, double rhs) {
+void SolverFormulacaoPadrao::ReverseConstraint(int cons_row, int rhs) {
     if (lp_->getSense(cons_row) == OPT_ROW::GREATER)
         lp_->chgSense(cons_row, OPT_ROW::LESS);
     else

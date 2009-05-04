@@ -74,6 +74,7 @@ int main(int argc, char* argv[]) {
   options.set_max_time(max_time);
   options.set_relative_time_for_first_solution(Globals::instance()->n() *
                                                Globals::instance()->m());
+  options.set_use_stabilization(true);
 
 	// Solver and input options
   Solver* solver;
@@ -99,8 +100,6 @@ int main(int argc, char* argv[]) {
 		sw->Start();
 		solver->Init(options);
 		solver->Solve(options, &status);
-    solver->Solve(options, &status);
-    solver->Solve(options, &status);
 		sw->Stop();
 	} else if (algorithm == "CPLEX-UB") {
     options.set_cut_off_value(upper_bound);

@@ -3,8 +3,9 @@
 #using <System.dll>
 using namespace System::Diagnostics;
 
-#include "ProblemSolution.h"
 #include "ConstructiveHeuristics.h"
+#include "logging.h"
+#include "ProblemSolution.h"
 #include "ProblemData.h"
 
 void LocalSearch::SimpleOPTSearch(const ProblemSolution& init_sol,
@@ -149,14 +150,16 @@ void LocalSearch::VNSBra(SolverFactory* solver_factory,
   options.set_max_time(TL);
   options.set_only_first_solution(true);
   // status = MIPSOLVE(TL, UB, first = true, x_opt, f_opt)
-  solver_intensification->Solve(options, NULL);
+  solver_intensification->Solve(options, status);
+  if (status->status == OPTSTAT_MIPOPTIMAL)
+    return;
   solver_intensification->GenerateSolution(&x_opt);  // creates initial solution
 
-  ProblemSolution x_cur = x_opt;
+  ProblemSolution x_cur(x_opt);
   double f_cur = x_opt.cost();
   while (elapsed_time < total_time_limit) {
-    cout << "Iteration " << ++iter << " - elapsed time: "
-         << static_cast<double>(elapsed_time) / 1000.0 << "s" << endl;
+    LOG(INFO) << "Iteration " << ++iter << " - elapsed time: "
+              << static_cast<double>(elapsed_time) / 1000.0 << "s" << endl;
 		elapsed_time += VNSIntensification(solver_intensification,
                                        Globals::instance()->n(),
                                        1,
@@ -167,8 +170,10 @@ void LocalSearch::VNSBra(SolverFactory* solver_factory,
     if (x_cur.cost() < x_opt.cost()) {  //f_cur < f_opt
       x_opt = x_cur;  // and f_opt = f_cur;
       k_cur = k_step;
+      LOG(INFO) << "VNSBra: found best solution, cost: " << x_opt.cost();
     } else {
       k_cur = k_cur + k_step;
+      VLOG(1) << "VNSBra: increasing step + " << k_step << " = " << k_cur;
     }
 
     // stopping condition
@@ -189,35 +194,40 @@ void LocalSearch::VNSBra(SolverFactory* solver_factory,
         solver_diversification->AddConsMaxAssignmentChanges(x_opt, k_cur + k_step);
 
       TL = total_time_limit - static_cast<int>(elapsed_time);
-      UB = Globals::Infinity();  //UB = x_opt.cost();
 
       sw->Start();
       SolverOptions options;
-      options.set_cut_off_value(UB);
-      options.set_max_time(TL * 1000.0);  // Converts milliseconds to seconds.
+      // UB = infinity
+      options.set_max_time(TL / 1000.0);  // Converts milliseconds to seconds.
       options.set_only_first_solution(true);
 
       // status = MIPSOLVE(TL, UB, first = true/false, x_cur, f_cur)
-      int status = solver_diversification->Solve(options, NULL);
+      LOG(INFO) << "VNSBra: Shaking Step - RHS = [" << k_cur << "," << k_cur + k_step
+                << "], TL = " << TL / 1000 << "s, UB = " << UB;
+      SolverStatus status;
+      solver_diversification->Solve(options, &status);
       sw->Stop();
       elapsed_time += sw->ElapsedMilliseconds;
       sw->Reset();
-      cout << "Shaking Step - RHS = [" << k_cur << "," << k_cur + k_step
-           << "], TL = " << TL / 1000 << "s, UB = " << UB << ", status = "
-           << status << endl;
+      LOG(INFO) << "VNSBra: Shaking Step - RHS = [" << k_cur << "," << k_cur + k_step
+                << "], TL = " << TL / 1000 << "s, UB = " << UB << ", status = "
+                << status.status;
 
       // remove last two added constraints
-      solver_diversification->RemoveConstraint(last_cons_less, last_cons_greater);  
+      solver_diversification->RemoveConstraint(last_cons_greater);
+      solver_diversification->RemoveConstraint(last_cons_less);  
 
       cont = false;
-			if (status == OPTSTAT_FEASIBLE || status == OPTSTAT_MIPOPTIMAL) {
+			if (status.status == OPTSTAT_FEASIBLE || status.status == OPTSTAT_MIPOPTIMAL) {
 				cont = false;
-				solver_diversification->GenerateSolution(&x_cur);
-				cout << "Shaking Step - stopping, found feasible/optimal solution: " << x_cur.cost();
+        //solver_diversification->GenerateSolution(&x_cur);
+        x_cur = status.final_sol;
+				LOG(INFO) << "VNSBra: Shaking Step - stopping, found feasible/optimal solution: "
+                  << x_cur.cost();
 			} else {
         cont = true;
         k_cur = k_cur + k_step;
-        cout << "Shaking Step - infeasible, continuing with disc size " << k_cur << endl;
+        LOG(INFO) << "VNSBra: Shaking Step - infeasible, continuing with disc size " << k_cur;
 			}
     }
   }
@@ -245,68 +255,82 @@ uint64 LocalSearch::VNSIntensification(VnsSolver *solver_intensification,
   int rhs = k_step;
   while (cont && elapsed_time < total_time_limit && rhs < max_opt) {
     int TL = min(node_time_limit, total_time_limit - static_cast<int>(elapsed_time));
-    // add local branching constraint delta(x, x_cur) <= rhs
+    LOG(INFO) << "VNSInt: Adding local branching constraint delta(x, x_cur) "
+              << "<= rhs = " << rhs;
     added_cons.push_back(solver_intensification->AddConsMaxAssignmentChanges(*x_cur, rhs));
-    double UB = x_cur->cost();  // UB = f_cur;
 
-	//solver_intensification->AddConsIntegerSolutionStrongCuttingPlane(*x_cur);
+    VLOG(1) << "VNSInt: UB = f_cur = " << x_cur->cost();
+    double UB = x_cur->cost();
 
     // runs CPLEX
     sw->Start();
     // status = MIPSOLVE(TL, UB, first = false, x_next, f_next)
     SolverOptions options; options.set_max_time(TL / 1000); options.set_cut_off_value(UB);
-    int status = solver_intensification->Solve(options, NULL);
+    VLOG(2) << "VNSInt: Calling solver_intensification with time: "
+            << options.max_time() << ", cutoff: " << options.cut_off_value();
+    SolverStatus status;
+    solver_intensification->Solve(options, &status);
+    VLOG(2) << "VNSInt: status = MIPSOLVE(TL=" << options.max_time() << ", UB="
+            << options.cut_off_value() << ", first=false, x_next, f_next) = "
+            << status.status;
     sw->Stop();
     elapsed_time += sw->ElapsedMilliseconds;
     sw->Reset();
 
-    cout << "VND search - RHS = " << rhs << ", TL = " << TL / 1000 << "s, UB = "
-         << UB << ", status = " << status << endl;
-    switch(status) {
+    LOG(INFO) << "VND search - RHS = " << rhs << ", TL = " << TL / 1000 << "s, UB = "
+              << UB << ", status = " << status.status;
+    switch(status.status) {
       case OPTSTAT_MIPOPTIMAL:
-        cout << "VND search - optimal, reverting constraint to delta(x, x_cur) >= "
-             << rhs + k_step << endl;
+        LOG(INFO) << "VND search - optimal, reverting constraint to delta(x, x_cur) >= "
+                  << rhs + k_step;
         // x_cur = x_next, f_cur = f_next;
-        solver_intensification->GenerateSolution(x_cur);
+        //solver_intensification->GenerateSolution(x_cur);
+        *x_cur = status.final_sol;
         // reverse last local branching constraint into delta(x, x_cur) >= rhs + k_step
         solver_intensification->ReverseConstraint(added_cons.back(), rhs + k_step);
         rhs = k_step;
         break;
       case OPTSTAT_FEASIBLE:
-        cout << "VND search - feasible, reverting constraint to delta(x, x_cur) >= "
-             << k_step << endl;
+        LOG(INFO) << "VND search - feasible, reverting constraint to delta(x, x_cur) >= "
+                  << k_step;
         //x_cur = x_next, f_cur = f_next;
-        solver_intensification->GenerateSolution(x_cur);
+        //solver_intensification->GenerateSolution(x_cur);
+        *x_cur = status.final_sol;
         // reverse last local branching constraint into delta(x, x_cur) >= k_step
         solver_intensification->ReverseConstraint(added_cons.back(), k_step);
         rhs = k_step;
         break;
       case OPTSTAT_INFEASIBLE:
-        cout << "VND search - proven infeasible, removing last constraint, new RHS = "
-             << rhs + k_step << endl;
+        LOG(INFO) << "VND search - proven infeasible, removing last constraint, "
+                  << "new RHS = " << rhs + k_step;
         // remove last local branching constraint;
         solver_intensification->RemoveConstraint(added_cons.back());
         added_cons.pop_back();
         rhs += k_step;
         break;
       case OPTSTAT_NOINTEGER:
-        cout << "VND search - infeasible, breaking out of the search" << endl;
+        LOG(INFO) << "VND search - infeasible, breaking out of the search";
         cont = false;
         break;
     }
     // stopping condition
     if (rhs >= Globals::instance()->n() ||
-        ((status == OPTSTAT_MIPOPTIMAL || status == OPTSTAT_FEASIBLE) &&
+        ((status.status == OPTSTAT_MIPOPTIMAL || status.status == OPTSTAT_FEASIBLE) &&
           x_cur->cost() == Globals::instance()->optimal())) {
+      LOG(INFO) << "VNSInt: stopping condition. RHS >= N or optimal cost solution found.";
       cont = false;
     }
   }
 	
 	// from the back so the constraint re-numbering doesn't screw up the removal
+  VLOG(2) << "VNSInt: removing all " << added_cons.size() << " added constraints.";
 	for (int i = added_cons.size() - 1; i >= 0; --i) {
 		// remove all added constraints
+    VLOG(3) << "VNSInt: removing " << i << "th constraint: " << added_cons[i];
 		solver_intensification->RemoveConstraint(added_cons[i]);
 	}
+
+  LOG(INFO) << "VNSInt: finished, returning time " << elapsed_time;
 	return elapsed_time;
 }
 

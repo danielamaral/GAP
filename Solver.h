@@ -130,7 +130,7 @@ public:
    * Processes the variable values and populates the output class.
    * @param ps A reference to the class to be populated.
    */
-	virtual void GenerateSolution(ProblemSolution *ps) {}
+	virtual void GenerateSolution(ProblemSolution *ps) = 0;
 
 protected:
    /** A reference to the problem's input data. */
@@ -154,5 +154,5 @@ class VnsSolver : public Solver {
   virtual void RemoveConstraint(int cons_row_begin, int cons_row_end) = 0;
   
   // Changes the sense of the constraint <cons_row> and updates the RHS side to <rhs>
-  virtual void ReverseConstraint(int cons_row, double rhs) = 0;
+  virtual void ReverseConstraint(int cons_row, int rhs) = 0;
 };

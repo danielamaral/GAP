@@ -14,6 +14,7 @@ class ProblemSolution
 public:
    //Constructor
    ProblemSolution(const ProblemData* pd);
+   ProblemSolution(const ProblemSolution& p);
 
    //Destructor
    ~ProblemSolution() {}

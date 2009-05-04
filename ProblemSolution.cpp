@@ -1,15 +1,26 @@
 #include "ProblemSolution.h"
 
 #include <cassert>
+#include "Globals.h"
 #include "ProblemData.h"
 
 using namespace std;
 
 ProblemSolution::ProblemSolution(const ProblemData* pd) : pd_(pd)
 {
-	assignment_.resize(pd->n(), -1);
-  used_.resize(pd->m(), 0);
+	assignment_.resize(pd_->n(), -1);
+  used_.resize(pd_->m(), 0);
 	Clear();
+}
+
+ProblemSolution::ProblemSolution(const ProblemSolution& p) {
+  pd_ = Globals::instance();
+  assignment_.resize(p.n(), -1);
+  used_.resize(p.m(), 0);
+	Clear();
+
+  for (int i = 0; i < p.n(); ++i)
+    this->set_assignment(i, p.assignment(i));
 }
 
 void ProblemSolution::set_assignment(int task, int machine) {
@@ -28,13 +39,11 @@ void ProblemSolution::set_assignment(int task, int machine) {
 
 int ProblemSolution::assignment(int task) const {
     assert(task < pd_->n());
-
     return assignment_[task];
 }
 
 int ProblemSolution::used(int machine) const {
     assert(machine < pd_->m());
-
     return used_[machine];
 }
 

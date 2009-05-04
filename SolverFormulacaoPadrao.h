@@ -50,7 +50,7 @@ public:
   
   // Changes the sense of the constraint <cons_row> and updates the right
   // hand side to <rhs>
-  void ReverseConstraint(int cons_row, double rhs);
+  void ReverseConstraint(int cons_row, int rhs);
     
 	int UpdateConsMaxAssignmentChangesEllipsoidal(
 		const ProblemSolution& x1, const ProblemSolution& x2, int k);

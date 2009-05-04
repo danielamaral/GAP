@@ -132,6 +132,50 @@ void SolverGeracaoColunas::RemoveColumnTasksFromMap(int column_index) {
   column_map_.erase(it);
 }
 
+void SolverGeracaoColunas::SetStatus(const OPTSTAT& previous, const OPTSTAT& current,
+                                     OPTSTAT* final) {
+  if (current == OPTSTAT_MIPOPTIMAL || previous == OPTSTAT_MIPOPTIMAL) {
+    *final = OPTSTAT_MIPOPTIMAL;
+    return;
+  }
+
+  // Se o atual ou o anterior são feasible, a resposta é sempre feasible.
+  if (current == OPTSTAT_FEASIBLE &&
+      (previous == OPTSTAT_NOINTEGER || previous == OPTSTAT_INFEASIBLE)) {
+    *final = OPTSTAT_FEASIBLE;
+    return;
+  }
+  if (previous == OPTSTAT_FEASIBLE &&
+      (current == OPTSTAT_NOINTEGER || current == OPTSTAT_INFEASIBLE)) {
+    *final = OPTSTAT_FEASIBLE;
+    return;
+  }
+  if (previous == OPTSTAT_FEASIBLE && current == OPTSTAT_FEASIBLE) {
+    *final = OPTSTAT_FEASIBLE;
+    return;
+  }
+
+  // Se existe contradicao entre infeasible e nointeger (time expired),
+  // a resposta eh nointeger.
+  if ((previous == OPTSTAT_NOINTEGER && current == OPTSTAT_INFEASIBLE) ||
+      (current == OPTSTAT_NOINTEGER && previous == OPTSTAT_INFEASIBLE)) {
+    *final = OPTSTAT_NOINTEGER;
+    return;
+  }
+  if (previous == OPTSTAT_NOINTEGER && current == OPTSTAT_NOINTEGER) {
+    *final = OPTSTAT_NOINTEGER;
+    return;
+  }
+
+  if (previous == OPTSTAT_INFEASIBLE && current == OPTSTAT_INFEASIBLE) {
+    *final = OPTSTAT_INFEASIBLE;
+    return;
+  }
+
+  CHECK(false) << "SetStatus: Unexpected combination, previous: " << previous
+               << ", current: " << current;
+}
+
 /********************************************************************
 **                   COLUMN GENERATION METHODS                     **
 *********************************************************************/
@@ -182,7 +226,7 @@ double SolverGeracaoColunas::GenerateColumns(const ProblemData& p,
                                              vector<vector<short> >* fixed_vars,
                                              double best_solution_value) {
 
-  VLOG(2) << "GenerateColumns: {num_columns: " << *num_columns
+  VLOG(3) << "GenerateColumns: {num_columns: " << *num_columns
           << ", best_solution_value: " << best_solution_value << "}";
   // Em cada laço desse loop tentaremos gerar num_machines() colunas, uma para
   // cada máquina.
@@ -199,16 +243,13 @@ double SolverGeracaoColunas::GenerateColumns(const ProblemData& p,
 
     OPTSTAT status;
     for (int method = 0; method < kNumLpMethods; ++method) {
-      VLOG(4) << "Trying method " << method << "...";
       status = lp->optimize(kMethodsToTry[method]);
-      VLOG(4) << "Method " << kMethodsToTry[method] << ": status " << status
-              << " obj " << lp->getObjVal();
       if (status == OPTSTAT_LPOPTIMAL || status == OPTSTAT_MIPOPTIMAL)
         break;
     }
     
     if (status != OPTSTAT_LPOPTIMAL && status != OPTSTAT_MIPOPTIMAL) {
-      LOG(ERROR) << "No method could solve the problem, trying harder...";
+      /*LOG(ERROR) << "No method could solve the problem, trying harder...";
 
       vector<double> x(lp->getNumCols());
       lp->getX(&x[0]);
@@ -251,26 +292,27 @@ double SolverGeracaoColunas::GenerateColumns(const ProblemData& p,
       }
       delete new_lp;
 
+      lp->setSimplexScreenLog(0);*/
+      VLOG(1) << "GenerateColumns: infeasible.";
       return Globals::Infinity();
       //assert(false);
     }
 
     objective_value = lp->getObjVal();
-    VLOG_EVERY_N(3, 50)
+    VLOG_EVERY_N(4, 50)
       << "GenerateColumns: loop start, objective_value: " << objective_value
       << ", status: " << status;
 
     if (TimeExpired()) {
-      VLOG(2) << "GenerateColumns: time expired, returning " << objective_value;
+      VLOG(3) << "GenerateColumns: time expired, returning " << objective_value;
       return objective_value;
     }
-    //lp->writeProbLP("SolverGeracaoColunas-gencol");
 
     // Mantem um limite no numero de colunas utilizadas: se for maior
     // que 40000, deleta 10000 colunas (escolhendo as colunas que tem o maior
     // custo reduzido) e re-otimiza.
     if(lp->getNumCols() > kMaxNumberColumns_) {
-      VLOG(1) << "GenerateColumns: excessive number of columns: "
+      VLOG(3) << "GenerateColumns: excessive number of columns: "
               << lp->getNumCols();
       RemoveExcessColumns(p, kNumColumnsToRemove_, &vContainer_, lp);
       lp->optimize(METHOD_PRIMAL);
@@ -279,12 +321,6 @@ double SolverGeracaoColunas::GenerateColumns(const ProblemData& p,
     // Os valores duais servirão para setar os preços para o subproblema
     vector<double> dual_values(lp->getNumRows(), 0.0);
     lp->getPi(&dual_values[0]);
-    if (VLOG_IS_ON(5)) {
-      stringstream dual_string;
-      for (int i = 0; i < static_cast<int>(dual_values.size()); ++i)
-        dual_string << dual_values[i] << ",";
-      VLOG(5) << "GenerateColumns: dual values: " << dual_string.str();
-    }
     
     // Custos reduzidos calculados a partir da solução da mochila
     vector<double> reduced_costs(p.num_machines());
@@ -352,7 +388,7 @@ double SolverGeracaoColunas::GenerateColumns(const ProblemData& p,
                               machine, knapsack_tasks, &vContainer_, lp);
         *num_columns += 1;
 
-        VLOG_EVERY_N(3, 197)
+        VLOG_EVERY_N(4, 197)
           << "GenerateColumns: new column: {machine: " << machine << ", reduced_cost: "
           << reduced_costs[machine] << ", price: " << knapsack_price
           << ", num_columns: " << *num_columns << ", objective_value: "
@@ -366,19 +402,19 @@ double SolverGeracaoColunas::GenerateColumns(const ProblemData& p,
 
       // Se gerou coluna para todos as máquinas e encontrou um lower bound
       // melhor (maior), guarda o lower bound
-      if(max_lower_bound < objective_value + sum_reduced_costs)
+      if (max_lower_bound < objective_value + sum_reduced_costs)
         max_lower_bound = objective_value + sum_reduced_costs;
 
       // Se o lower bound encontrado for maior que o upper bound, pode retornar
-      if(objective_value + sum_reduced_costs >=
-         best_solution_value - 1 + Globals::BigEPS()) {
-        VLOG(3) << "GenerateColumns: end, obj_val + reduced_costs >= best solution: "
+      //if (objective_value + sum_reduced_costs > best_solution_value - 1.0 + Globals::BigEPS()) {
+      if (objective_value + sum_reduced_costs > best_solution_value) {
+        VLOG(4) << "GenerateColumns: end, obj_val + reduced_costs >= best solution: "
                 << objective_value << " + " << sum_reduced_costs << " >= "
-                << best_solution_value +1 - Globals::BigEPS();
+                << best_solution_value - 1.0 + Globals::BigEPS();
         return objective_value + sum_reduced_costs;
       }
 
-      VLOG_EVERY_N(3, 50)
+      VLOG_EVERY_N(4, 50)
         << "GenerateColumns: added at least one column: {sum_reduced_costs: "
         << sum_reduced_costs << ", max_lower_bound: " << max_lower_bound << "}";
     }
@@ -401,7 +437,7 @@ double SolverGeracaoColunas::GenerateColumns(const ProblemData& p,
 void SolverGeracaoColunas::AdjustStabilizationBounds(
     const ProblemData& p, double bound,
     const VariableGeracaoColunasContainer& vContainer, OPT_LP* lp) {
-  VLOG(1) << "Adjusting stabilization bounds to " << bound;
+  VLOG(2) << "Adjusting stabilization bounds to " << bound;
   vector<double> variable_bounds(2*(p.num_tasks() + p.num_machines()), bound);
   vector<BOUNDTYPE> bound_types(2*(p.num_tasks() + p.num_machines()), BOUND_UPPER);
   vector<int> variable_indices(2*(p.num_tasks() + p.num_machines()));
@@ -431,7 +467,7 @@ void SolverGeracaoColunas::AdjustStabilizationBounds(
 void SolverGeracaoColunas::UpdateStabilizationCosts(
     const ProblemData& p, const vector<double>& dual_values,
     VariableGeracaoColunasContainer* vContainer, OPT_LP* lp) {
-  VLOG(1) << "Updating stabilization costs";
+  VLOG(2) << "Updating stabilization costs";
   for (int v = 0, c = 0; v < static_cast<int>(vContainer->size()); ++v) {
     VariableGeracaoColunas* var = &(*vContainer)[v];
     int index = v;
@@ -479,15 +515,16 @@ double SolverGeracaoColunas::GenerateColumnsWithStabilization(
     double new_lower_bound =
       GenerateColumns(p, lp, num_columns, fixed_vars, best_solution_value);
     if (b > 0)
-      CHECK_GE(new_lower_bound, lower_bound - Globals::BigEPS())
+      CHECK_GE(new_lower_bound + Globals::BigEPS(), lower_bound - Globals::BigEPS())
         << "Stabilization: new_lower_bound (" << new_lower_bound << ") < "
         << "lower_bound (" << lower_bound << ")";
 
     // O 'max' abaixo só é necessário devido a problemas de precisão numérica
     lower_bound = max<double>(lower_bound, new_lower_bound);
-    if (lower_bound > best_solution_value - 1.0 + Globals::BigEPS()) {
-      VLOG(1) << "Stabilization: lower_bound > best_solution_value: "
-              << lower_bound << " > " << best_solution_value - 1.0 + Globals::BigEPS();
+    //if (lower_bound >= best_solution_value - 1.0 + Globals::BigEPS()) {
+    if (lower_bound > best_solution_value) {
+      VLOG(2) << "Stabilization: lower_bound > best_solution_value: "
+              << lower_bound << " > " << best_solution_value;
       return lower_bound;
     }
 
@@ -501,7 +538,7 @@ double SolverGeracaoColunas::GenerateColumnsWithStabilization(
     }*/
 
     if (TimeExpired()) {
-      VLOG(2) << "Stabilization: time expired, returning " << lower_bound;
+      VLOG(1) << "Stabilization: time expired, returning " << lower_bound;
       return lower_bound;
     }
   }
@@ -517,6 +554,8 @@ double SolverGeracaoColunas::GenerateColumnsWithStabilization(
 OPTSTAT SolverGeracaoColunas::SetUpAndRunBranchAndBound(
     const ProblemData& p,
     int num_nodes_limit,
+    double cut_off_value,
+    bool first_only,
     OPT_LP* lp,
     ProblemSolution* integer_solution) {
   int num_columns = 0;
@@ -527,11 +566,13 @@ OPTSTAT SolverGeracaoColunas::SetUpAndRunBranchAndBound(
   vector<vector<short> > fixed_vars(p.num_machines(),
                                     vector<short>(p.num_tasks(), -1));
 
-  OPTSTAT status = OPTSTAT_NOINTEGER;
+  OPTSTAT status = OPTSTAT_INFEASIBLE;
   BB(p,
      num_nodes_limit,  // limiteNos = 1000000
      0,  // profundidade = 0
      0,  // Lower bound = 0
+     cut_off_value,  // upper bound = cut_off_value
+     first_only,  // first_only = first_only
      lp,
      integer_solution,  // melhorSolucao = integer_solution
      &fixed_vars,  // fixado = fixed
@@ -548,6 +589,8 @@ double SolverGeracaoColunas::BB(const ProblemData& p,
                                 int num_nodes_limit,
                                 int depth,
                                 double lower_bound,
+                                double cut_off_value,
+                                bool first_only,
                                 OPT_LP* lp,
                                 ProblemSolution* best_solution,
                                 vector<vector<short> >* fixed_vars,
@@ -558,48 +601,61 @@ double SolverGeracaoColunas::BB(const ProblemData& p,
   //tLpNo.reset();
   //tMochilaNo.reset();
 
+  if (first_only && *status == OPTSTAT_FEASIBLE) {
+    VLOG(2) << "BB(" << depth << "): returning first solution only, cost: "
+            << best_solution->cost();
+    return Globals::Infinity();
+  }
+
   VLOG(2) << "BB(" << depth << "): {num_visited_nodes: " << *num_visited_nodes
           << ", pct_tree_solved: " << *pct_tree_solved << ", lower_bound: "
           << lower_bound << "}";
   double new_lower_bound;
   if (stabilize_column_generation_) {
     new_lower_bound = GenerateColumnsWithStabilization(
-        p, lp, num_columns, fixed_vars, best_solution->cost());
+        p, lp, num_columns, fixed_vars, cut_off_value);
   } else {
     new_lower_bound = GenerateColumns(
-        p, lp, num_columns, fixed_vars, best_solution->cost());
+        p, lp, num_columns, fixed_vars, cut_off_value);
   }
   VLOG(2) << "BB(" << depth << "): column generation lower bound: "
           << new_lower_bound;
   if (depth == 0) {
-    LOG(INFO) << "BB(" << depth << "): root node lower bound: " << new_lower_bound;
+    VLOG(1) << "BB(" << depth << "): root node lower bound: " << new_lower_bound;
     root_lower_bound_ = new_lower_bound;
   } else {
     ++total_num_nodes_;
   }
 
-  *num_visited_nodes += 1;
-  if(*num_visited_nodes >= num_nodes_limit) {
-    VLOG(1) << "BB(" << depth << "): num_visited_nodex > limit: "
-            << *num_visited_nodes << ", return: " << new_lower_bound;
-    return new_lower_bound;
-  }
-
   // Se o melhor LB encontrado for maior que a melhor solução encontrada
-  if(new_lower_bound >= best_solution->cost() - 1.0 + Globals::BigEPS()) {
+  //if (new_lower_bound >= cut_off_value - 1.0 + Globals::BigEPS()) {
+  if (new_lower_bound > cut_off_value || new_lower_bound == Globals::Infinity()) {
     *pct_tree_solved += pow(0.5, static_cast<double>(depth));
-    if(*pct_tree_solved >= 1.0 - Globals::EPS()) {
-      // Se a porcentagem do BB já resolvido for >= 1 ajusta resposta
-      *status = OPTSTAT_MIPOPTIMAL;
-    }
+    // TODO(danielrocha): isso ta certo?
+    //if (*pct_tree_solved >= 1.0 - Globals::EPS()) {
+    //  // Se a porcentagem do BB já resolvido for >= 1 ajusta resposta
+    //  SetStatus(*status, OPTSTAT_MIPOPTIMAL, status);
+    //} else {
+      SetStatus(*status, OPTSTAT_INFEASIBLE, status);
+    //}
     VLOG(1) << "BB(" << depth << "): lower_bound > best_solution, pct_tree_solved: "
             << *pct_tree_solved << ", status = " << *status;
     return new_lower_bound;
   }
 
+  *num_visited_nodes += 1;
+  if (*num_visited_nodes >= num_nodes_limit) {
+    SetStatus(*status, OPTSTAT_NOINTEGER, status);
+    VLOG(1) << "BB(" << depth << "): num_visited_nodes > limit: "
+            << *num_visited_nodes << ", return: " << new_lower_bound
+            << ", status: " << *status;
+    return new_lower_bound;
+  }
+
   if (TimeExpired()) {
-    VLOG(2) << "BB(" << depth << "): time expired (after GenerateColumns), returning "
-            << new_lower_bound;
+    SetStatus(*status, OPTSTAT_NOINTEGER, status);
+    VLOG(1) << "BB(" << depth << "): time expired (after GenerateColumns), returning "
+            << new_lower_bound << ", status: " << *status;
     return new_lower_bound;
   }
 
@@ -661,31 +717,32 @@ double SolverGeracaoColunas::BB(const ProblemData& p,
   */
   
   //determinando quem serah fixado
-  int num_integer_vars = 0;
-  int num_variables_on_one = 0;
-  double current_cost = 0.0;
+
 
   // TODO(danielrocha): move parameters to a better place
-  static const int kMaxDepthFixingVars_ = 4;
+  static const int kMaxDepthFixingVars_ = 0;
   static const int kNumberOfLookupsFixingVars_[] = { 10, 8, 6, 4 };
   //static const int kNumberOfLookupsFixingVars_[] = { 15, 5, 3, 2 };
   //static const int kNumberOfLookupsFixingVars_[] = { 4, 3, 2, 1 };
 
-  int fixed_machine;
-  int fixed_task;
+  int num_integer_vars = 0;
+  int num_variables_on_one = 0;
+  double current_cost = 0.0;
+  int fixed_machine = -1;
+  int fixed_task = -1;
   if(depth < kMaxDepthFixingVars_) {
-    VLOG(1) << "BB(" << depth << "): calling SelectFixedVariables to select variables.";
+    VLOG(2) << "BB(" << depth << "): calling SelectFixedVariables to select variables.";
     num_integer_vars =
       SelectFixedVariable(p, kNumberOfLookupsFixingVars_[depth],
-                          x, lp, best_solution, fixed_vars, num_columns,
+                          x, cut_off_value, lp, best_solution, fixed_vars, num_columns,
                           &fixed_machine, &fixed_task);
   } else {
-    VLOG(1) << "BB(" << depth << "): selecting variables using heuristic.";
+    VLOG(2) << "BB(" << depth << "): selecting variables using heuristic.";
     double bestVal = 0.0;
     for (int machine = 0; machine < p.num_machines(); ++machine)
       for (int task = 0; task < p.num_tasks(); ++task)
-        if(x[machine][task] > 1.0 - Globals::EPS() ||
-           x[machine][task] < Globals::EPS()) {
+        if (x[machine][task] > 1.0 - Globals::EPS() ||
+            x[machine][task] < Globals::EPS()) {
           ++num_integer_vars;
           if (x[machine][task] > 1.0 - Globals::EPS()) {
             ++num_variables_on_one;
@@ -703,88 +760,138 @@ double SolverGeracaoColunas::BB(const ProblemData& p,
   VLOG(1) << "BB(" << depth << "): fixed task: " << fixed_task << " and machine: "
           << fixed_machine;
 
-  // Se o numero de variaveis inteiras é igual ao total de variáveis, acabou-se
-  // o B&B.
+  // Se a solução ótima do problema linear é composta de variáveis inteiras, ela é
+  // também o ótimo para o problema inteiro. Não é mais necessário fazer B&B.
   if (num_integer_vars == p.num_machines() * p.num_tasks()) {
-    *status = OPTSTAT_FEASIBLE;
-    if (lp->getObjVal() < best_solution->cost()) {
-      best_solution->Clear();
-      for(int machine = 0; machine < p.num_machines(); ++machine) {
-        for(int task = 0; task < p.num_tasks(); ++task) {
-          if (x[machine][task] > 1.0 - Globals::EPS())
-            best_solution->set_assignment(task, machine);
-        }
-      }
-      CHECK(best_solution->IsValid());
-      CHECK_EQ(best_solution->cost(), static_cast<int>(lp->getObjVal() + Globals::EPS()))
-        << "Best BB solution must be equal to lp->getObjVal()";
-      LOG(INFO) << "BB(" << depth << "): Found best integer solution: "
-                << best_solution->cost() << ", lower bound: " << new_lower_bound;
-      node_with_best_result_ = total_num_nodes_;
-    }
-    
     *pct_tree_solved += pow(0.5, static_cast<double>(depth));
-    // Se temos todas as variáveis inteiras e já resolvemos toda a árvore, 
-    // temos a solução ótima.
-    if(*pct_tree_solved > 1.0 - Globals::EPS()) {
-      *status = OPTSTAT_MIPOPTIMAL;
+    bool feasible = VnsCutUtil::IsValidFinalXijMatrix(vns_cuts_, x);
+
+    if (feasible) {  // Se a solução encontrada satisfaz os cortes do VNS.
+      SetStatus(*status, OPTSTAT_FEASIBLE, status);
+      if (best_solution->cost() == 0 || lp->getObjVal() < best_solution->cost()) {
+        best_solution->Clear();
+        for(int machine = 0; machine < p.num_machines(); ++machine) {
+          for(int task = 0; task < p.num_tasks(); ++task) {
+            if (x[machine][task] > 1.0 - Globals::EPS())
+              best_solution->set_assignment(task, machine);
+          }
+        }
+        CHECK(best_solution->IsValid());
+        CHECK_EQ(best_solution->cost(), static_cast<int>(lp->getObjVal() + Globals::EPS()))
+          << "Best BB solution must be equal to lp->getObjVal()";
+        LOG(INFO) << "BB(" << depth << "): Found best integer solution: "
+                  << best_solution->cost() << ", lower bound: " << new_lower_bound;
+        node_with_best_result_ = total_num_nodes_;
+      }
+      
+      // Se temos todas as variáveis inteiras e já resolvemos toda a árvore, 
+      // temos a solução ótima.
+      if(*pct_tree_solved > 1.0 - Globals::EPS()) {
+        SetStatus(*status, OPTSTAT_MIPOPTIMAL, status);
+      }
+      VLOG(1) << "BB(" << depth << "): all integer: {pct_tree_solved: "
+              << *pct_tree_solved << ", status: " << *status << "}";
+      return new_lower_bound;
+    } else {
+      SetStatus(*status, OPTSTAT_INFEASIBLE, status);
+      VLOG(1) << "BB(" << depth << "): all integer: {pct_tree_solved: "
+              << *pct_tree_solved << ", status: infeasible due to VNS cuts, "
+              << ", final status: " << *status << "}.";
+      return Globals::Infinity();
     }
-    VLOG(1) << "BB(" << depth << "): all integer: {pct_tree_solved: "
-            << *pct_tree_solved << ", status: " << *status << "}";
-    return new_lower_bound;
-  } else {
+  }
+  /* else {
     // Calcula uma aproximacao do quanto resta adicionar ao custo da solucao
     if ((p.num_tasks() - num_variables_on_one) * p.MinimumAssignmentCost() + current_cost >
          best_solution->cost()) {
-      LOG(INFO) << "BB(" << depth << "): estimation shows that this node "
-                << "is not promising: num_variables_on_one: " << num_variables_on_one
-                << ", current_cost: " << current_cost << ", minimum assignment cost: "
-                << p.MinimumAssignmentCost() << ", best solution: "
-                << best_solution->cost();
+      VLOG(1) << "BB(" << depth << "): estimation shows that this node "
+              << "is not promising: num_variables_on_one: " << num_variables_on_one
+              << ", current_cost: " << current_cost << ", minimum assignment cost: "
+              << p.MinimumAssignmentCost() << ", best solution: "
+              << best_solution->cost();
       return new_lower_bound;
     }
+  }*/
+
+  if (fixed_machine < 0 || fixed_task < 0) {
+    SetStatus(*status, OPTSTAT_INFEASIBLE, status);
+    VLOG(1) << "BB(" << depth << "): couldn't select any fixing variable, "
+            << "returning status: " << *status;
+    return Globals::Infinity();
   }
 
-  VLOG(1) << "BB(" << depth << "): number of integer variables: "
-          << num_integer_vars;
+  double new_cut_off_value = cut_off_value;
+  if (best_solution->cost() > 0 && best_solution->cost() < new_cut_off_value)
+    new_cut_off_value = best_solution->cost();
 
-  FixVariableAndContinueBB(FIX_ON_ZERO,
-                           fixed_machine,
-                           fixed_task,
-                           num_nodes_limit,
-                           new_lower_bound,
-                           p,
-                           lp,
-                           best_solution,
-                           fixed_vars,
-                           num_columns,
-                           depth,
-                           pct_tree_solved,
-                           num_visited_nodes,
-                           status);
+  VLOG(2) << "BB(" << depth << "): number of integer variables: "
+          << num_integer_vars << ", new cutoff: " << new_cut_off_value;
+
+  if (VnsCutUtil::CanFixCandidate(vns_cuts_, *fixed_vars, fixed_machine,
+                                  fixed_task, FIX_ON_ONE)) {
+    FixVariableAndContinueBB(FIX_ON_ONE,
+                             fixed_machine,
+                             fixed_task,
+                             num_nodes_limit,
+                             new_lower_bound,
+                             new_cut_off_value,
+                             first_only,
+                             p,
+                             lp,
+                             best_solution,
+                             fixed_vars,
+                             num_columns,
+                             depth,
+                             pct_tree_solved,
+                             num_visited_nodes,
+                             status);
+  } else {
+    *pct_tree_solved += pow(0.5, static_cast<double>(depth + 1));
+    VLOG(1) << "BB(" << depth << "): unable to fix var due to VNS cuts, task: "
+            << fixed_task << ", machine: " << fixed_machine << ", sense: " << FIX_ON_ONE
+            << ", pct tree: " << *pct_tree_solved;
+  }
 
   if (TimeExpired()) {
-    VLOG(2) << "BB(" << depth << "): time expired (after FixAndContinue), returning "
-            << new_lower_bound;
+    SetStatus(*status, OPTSTAT_NOINTEGER, status);
+    VLOG(1) << "BB(" << depth << "): time expired (after FixAndContinue), returning "
+            << new_lower_bound << ", status: " << *status;
     return new_lower_bound;
   }
-  
-  FixVariableAndContinueBB(FIX_ON_ONE,
-                           fixed_machine,
-                           fixed_task,
-                           num_nodes_limit,
-                           new_lower_bound,
-                           p,
-                           lp,
-                           best_solution,
-                           fixed_vars,
-                           num_columns,
-                           depth,
-                           pct_tree_solved,
-                           num_visited_nodes,
-                           status);
 
-  VLOG(1) << "BB(" << depth << "): end, return value: " << new_lower_bound;
+  if (VnsCutUtil::CanFixCandidate(vns_cuts_, *fixed_vars, fixed_machine,
+                                  fixed_task, FIX_ON_ZERO)) {
+    FixVariableAndContinueBB(FIX_ON_ZERO,
+                             fixed_machine,
+                             fixed_task,
+                             num_nodes_limit,
+                             new_lower_bound,
+                             new_cut_off_value,
+                             first_only,
+                             p,
+                             lp,
+                             best_solution,
+                             fixed_vars,
+                             num_columns,
+                             depth,
+                             pct_tree_solved,
+                             num_visited_nodes,
+                             status);
+  } else {
+    *pct_tree_solved += pow(0.5, static_cast<double>(depth + 1));
+    VLOG(1) << "BB(" << depth << "): unable to fix var due to VNS cuts, task: "
+            << fixed_task << ", machine: " << fixed_machine << ", sense: " << FIX_ON_ZERO
+            << ", pct tree: " << *pct_tree_solved;
+  }
+
+  if (*pct_tree_solved >= 1.0 - Globals::EPS()) {
+    if (*status == OPTSTAT_FEASIBLE && !first_only)
+      *status = OPTSTAT_MIPOPTIMAL;
+    VLOG(1) << "BB(" << depth << "): 100% of the tree solved, status: " << *status;
+  }
+
+  VLOG(1) << "BB(" << depth << "): end, return value: " << new_lower_bound
+          << ", status: " << *status;
   return new_lower_bound;
 }
 
@@ -866,8 +973,8 @@ bool SolverGeracaoColunas::ShouldRemoveColumnWhenFixing(
 
 double SolverGeracaoColunas::FixVariableAndContinueBB(
     FixingSense fixing_sense, int fixed_machine, int fixed_task,
-    int num_nodes_limit, double lower_bound,
-    const ProblemData& p, OPT_LP* lp,
+    int num_nodes_limit, double lower_bound, double cut_off_value,
+    bool first_only, const ProblemData& p, OPT_LP* lp,
     ProblemSolution* best_solution,
     vector<vector<short> >* fixed_vars, int* num_columns, int depth,
     double* pct_tree_solved, int* num_visited_nodes, OPTSTAT* status) {
@@ -905,8 +1012,8 @@ double SolverGeracaoColunas::FixVariableAndContinueBB(
   }
 
   // Chama o Branch and Bound
-  double retorno = BB(p, num_nodes_limit, depth + 1, lower_bound, lp,
-                      best_solution, fixed_vars,
+  double retorno = BB(p, num_nodes_limit, depth + 1, lower_bound, cut_off_value,
+                      first_only, lp, best_solution, fixed_vars,
                       num_columns, pct_tree_solved, num_visited_nodes,
                       status);
 
@@ -930,7 +1037,7 @@ double SolverGeracaoColunas::EvaluateVariableToFix(
 
 int SolverGeracaoColunas::SelectFixedVariable(
     const ProblemData& p, int num_vars_lookup,
-    const vector<vector<double> >& x, OPT_LP* lp,
+    const vector<vector<double> >& x, double cut_off, OPT_LP* lp,
     ProblemSolution* best_solution, vector<vector<short> >* fixed_vars,
     int* num_columns, int* fixed_machine, int* fixed_task) {
 
@@ -971,7 +1078,7 @@ int SolverGeracaoColunas::SelectFixedVariable(
 
     double fixed_on_zero =
       FixVariableAndContinueBB(FIX_ON_ZERO, candidate.machine, candidate.task, 1,
-                               1000000, p, lp, best_solution, fixed_vars,
+                               1000000, cut_off, false, p, lp, best_solution, fixed_vars,
                                num_columns, 0, &pct_tree_solved,
                                &num_visited_nodes, &status);
 
@@ -979,7 +1086,7 @@ int SolverGeracaoColunas::SelectFixedVariable(
     pct_tree_solved = 0.0;
     double fixed_on_one =
       FixVariableAndContinueBB(FIX_ON_ONE, candidate.machine, candidate.task, 1,
-                               1000000, p, lp, best_solution, fixed_vars,
+                               1000000, cut_off, false, p, lp, best_solution, fixed_vars,
                                num_columns, 0, &pct_tree_solved,
                                &num_visited_nodes, &status);
     // TODO(danielrocha): porque diabos otimizar aqui??
@@ -999,7 +1106,7 @@ int SolverGeracaoColunas::SelectFixedVariable(
       best_value = heuristic_value;
     }
     if (TimeExpired()) {
-      VLOG(2) << "SelectFixedVariable: time expired, returning: fixed_machine: "
+      VLOG(1) << "SelectFixedVariable: time expired, returning: fixed_machine: "
               << *fixed_machine << ", fixed_task: " << *fixed_task << ", value: "
               << best_value << ", num_integer_vars: " << num_integer_vars;
       return num_integer_vars;
@@ -1018,7 +1125,8 @@ OPTSTAT SolverGeracaoColunas::AddInitialColumns(bool first, int time_limit,
   LOG(INFO) << "Using " << time_limit << "s to find the first solution.";
   OPTSTAT first_status = SolverFormulacaoPadrao::GetIntegerSolutionWithTimeLimit(
       *problem_data_, time_limit, integer_solution);
-  LOG(INFO) << "Got first integer solution, with cost " << integer_solution->cost();
+  LOG(INFO) << "Got first integer solution, with cost " << integer_solution->cost()
+            << ", status: " << first_status;
 
   // Adiciona a solução inteira ao modelo
   AddIntegerSolutionColumnsWithCoeficients(*problem_data_,
@@ -1031,7 +1139,8 @@ OPTSTAT SolverGeracaoColunas::AddInitialColumns(bool first, int time_limit,
 void SolverGeracaoColunas::AddStabilizationColumnsWithCoeficients(
     const ProblemData& p, const vector<double>& relaxed_dual_values,
     VariableGeracaoColunasContainer* vContainer, OPT_LP* lp) {
-  const double epsD = 0.1;
+  const double initial_upper_bound = 0.0;
+
   // Adiciona a identidade positiva para a estabilização da geração de colunas
   // às restrições do tipo SUM(vy) = 1 e SUM(y) <= 1.
   for (int index = 0; index < p.num_tasks() + p.num_machines(); ++index) {
@@ -1044,9 +1153,8 @@ void SolverGeracaoColunas::AddStabilizationColumnsWithCoeficients(
     var.set_cost(relaxed_dual_values[index]);
 
     // Adds the column
-    // TODO(danielrocha): adjust the bounds for stabilization
     vContainer->push_back(var);
-    double lower_bound = 0.0, upper_bound = 0.1;
+    double lower_bound = 0.0, upper_bound = initial_upper_bound;
     lp->newCol(
       OPT_COL(OPT_COL::VAR_CONTINUOUS, var.cost(), lower_bound, upper_bound),
       var.ToString().c_str());
@@ -1070,9 +1178,8 @@ void SolverGeracaoColunas::AddStabilizationColumnsWithCoeficients(
     var.set_cost(-1.0 * relaxed_dual_values[index]);
 
     // Adds the column
-    // TODO(danielrocha): adjust the bounds for stabilization
     vContainer->push_back(var);
-    double lower_bound = 0.0, upper_bound = 0.1;
+    double lower_bound = 0.0, upper_bound = initial_upper_bound;
     lp->newCol(
       OPT_COL(OPT_COL::VAR_CONTINUOUS, var.cost(), lower_bound, upper_bound),
       var.ToString().c_str());
@@ -1195,6 +1302,10 @@ void SolverGeracaoColunas::AddSumAssignmentsPerMachineAtMostOneConstraints(
 **                SOLVING AND RESULTS METHODS                      **
 *********************************************************************/
 
+void SolverGeracaoColunas::GenerateSolution(ProblemSolution* sol) {
+  GenerateSolution(*problem_data_, vContainer_, *lp_, sol);
+}
+
 void SolverGeracaoColunas::GenerateSolution(
     const ProblemData& p,
     const VariableGeracaoColunasContainer& vContainer,
@@ -1221,6 +1332,7 @@ void SolverGeracaoColunas::GenerateSolution(
 
 int SolverGeracaoColunas::Solve(const SolverOptions& options,
                                 SolverStatus* output_status) {
+  CHECK_NOTNULL(output_status);
   // Sets the time limits
   time_limit_in_milliseconds_ = static_cast<uint64>(options.max_time() * 1000.0);
 
@@ -1239,19 +1351,18 @@ int SolverGeracaoColunas::Solve(const SolverOptions& options,
       output_status->status = OPTSTAT_FEASIBLE;
     }
 
-    if (options.cut_off_value() > 0.0 &&
-        options.cut_off_value() < sol->cost())
-      sol->set_cost(static_cast<int>(options.cut_off_value() + Globals::EPS()));
-
-    VLOG(1) << "Generated first set of columns: " << lp_->getObjVal()
-            << ", cut_off value: " << sol->cost();
+    VLOG(1) << "Generated first set of columns: " << lp_->getObjVal();
   }
 
-  if (output_status->status != OPTSTAT_MIPOPTIMAL &&
-      output_status->status != OPTSTAT_FEASIBLE) {
+  VLOG(1) << "Cut_off value: " << options.cut_off_value();
+
+  if ((!options.only_first_solution() || vns_cuts_.size() > 0) &&
+       output_status->status != OPTSTAT_MIPOPTIMAL) {
     int num_nodes_limit = 1000000;
     output_status->status = SetUpAndRunBranchAndBound(*problem_data_,
                                                       num_nodes_limit,
+                                                      options.cut_off_value(),
+                                                      options.only_first_solution(),
                                                       lp_,
                                                       sol);
   }
@@ -1259,8 +1370,8 @@ int SolverGeracaoColunas::Solve(const SolverOptions& options,
   // Para o relogio
   stopwatch_->Stop();
 
-  if (TimeExpired()) {
-    output_status->str_status = "time_expired";
+  if (TimeExpired() || output_status->status == OPTSTAT_FEASIBLE) {
+    output_status->str_status = (TimeExpired() ? "time_expired" : "feasible");
     output_status->gap_absolute = sol->cost() - root_lower_bound_;
     output_status->gap_relative = output_status->gap_absolute / sol->cost();
   } else {
@@ -1280,20 +1391,39 @@ int SolverGeracaoColunas::Solve(const SolverOptions& options,
 
 int SolverGeracaoColunas::AddConsMaxAssignmentChanges(
     const ProblemSolution& sol, int num_changes) {
-  return 0;
+  VnsCut cut;
+  cut.set_max_changes(num_changes);
+  cut.set_solution(sol);
+  vns_cuts_.push_back(cut);
+  return vns_cuts_.size() - 1;
 }
 
 int SolverGeracaoColunas::AddConsMinAssignmentChanges(
     const ProblemSolution& sol, int num_changes) {
-  return 0;
+  VnsCut cut;
+  cut.set_min_changes(num_changes);
+  cut.set_solution(sol);
+  vns_cuts_.push_back(cut);
+  return vns_cuts_.size() - 1;
 }
 
 // Removes the constraint <cons_row> or the range [cons_row_begin, cons_row_end]
 void SolverGeracaoColunas::RemoveConstraint(int cons_row) {
+  vns_cuts_.erase(vns_cuts_.begin() + cons_row);
 }
+
 void SolverGeracaoColunas::RemoveConstraint(int cons_row_begin, int cons_row_end) {
+  vns_cuts_.erase(vns_cuts_.begin() + cons_row_begin, vns_cuts_.begin() + cons_row_end + 1);
 }
-  
+
 // Changes the sense of the constraint <cons_row> and updates the RHS side to <rhs>
-void SolverGeracaoColunas::ReverseConstraint(int cons_row, double rhs) {
+void SolverGeracaoColunas::ReverseConstraint(int cons_row, int rhs) {
+  VnsCut* cut = &vns_cuts_[cons_row];
+  if (cut->min_changes() >= 0) {
+    cut->set_max_changes(cut->min_changes());
+    cut->set_min_changes(-1);
+  } else {
+    cut->set_min_changes(cut->max_changes());
+    cut->set_max_changes(-1);
+  }
 }
