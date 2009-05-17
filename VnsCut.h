@@ -32,6 +32,7 @@ class VnsCutUtil {
                               int fixing_machine, int fixing_task,
                               FixingSense sense);
 
+ protected:
   static int Delta(const VnsCut& cut, const vector<vector<double> >& x);
   static void Delta(
      const VnsCut& cut, const vector<vector<short> >& already_fixed,

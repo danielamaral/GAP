@@ -27,36 +27,42 @@ namespace LocalSearch {
 		NUM_PARAMS
 	};
 
-    void SimpleOPTSearch(const ProblemSolution& init_sol,
-		int max_opt,
-		int k_step,
-		int total_time,
-		int initial_time,
-		int ls_time,
-		ProblemSolution* sol);
-	uint64 EllipsoidalSearch(
-		const ProblemSolution& x1,
-		const ProblemSolution& x2,
-		int max_opt,
-		int k_step,
-		int step_time,
-		int total_time,
-		ProblemSolution* final_sol);
-	void MultiEllipsoidalSearch();
+  void SimpleOPTSearch(
+      const ProblemSolution& init_sol,
+      int max_opt,
+      int k_step,
+      int total_time,
+      int initial_time,
+      int ls_time,
+      ProblemSolution* sol);
+
+  uint64 EllipsoidalSearch(
+	    const ProblemSolution& x1,
+	    const ProblemSolution& x2,
+	    int max_opt,
+	    int k_step,
+	    int step_time,
+	    int total_time,
+	    ProblemSolution* final_sol);
+
+  void MultiEllipsoidalSearch();
 
 	// VNS, returns the total elapsed time in the method
-	uint64 VNSIntensification(VnsSolver *solver_intensification,
-                            int max_opt,
-                            int k_step,
-                            int total_time_limit,
-                            int node_time_limit,
-                            ProblemSolution* x_cur);
+	uint64 VNSIntensification(
+      VnsSolver *solver_intensification,
+      int max_opt,
+      int k_step,
+      int total_time_limit,
+      int node_time_limit,
+      ProblemSolution* x_cur);
 
-  void VNSBra(SolverFactory* solver_factory,
-              int total_time_limit,
-              int node_time_limit,
-              int k_step,
-              SolverStatus* status);
+  void VNSBra(
+      SolverFactory* solver_factory,
+      int total_time_limit,
+      int node_time_limit,
+      int k_step,
+      SolverStatus* status);
+
 	// Tabu
 	void MIPTabuSearch(
 		ProblemSolution* sol);

@@ -77,7 +77,7 @@ uint64 LocalSearch::EllipsoidalSearch(const ProblemSolution& x1,
 
   int opt = 0;
 	for (int opt = k_step; opt <= max_opt && elapsed_time < total_time; opt += k_step) {
-		solver.UpdateConsMaxAssignmentChangesEllipsoidal(x1, x2, opt);
+		solver.AddEllipsoidalConstraint(x1, x2, opt);
 		
 		sw->Start();
 		int status = solver.Solve(options, NULL);
@@ -109,7 +109,7 @@ void LocalSearch::MultiEllipsoidalSearch() {
 	for (int i = 0; i < static_cast<int>(pool.size()); ++i) {
 		for (int j = i + 1; j < static_cast<int>(pool.size()); ++j) {
 			int d = pool[i].Distance(pool[j]);
-			cout << "Distance between " << i << " and " << j << " is " << d << endl;
+			LOG(INFO) << "Distance between " << i << " and " << j << " is " << d;
 			if (d > max_dist) {
 				max_dist = d;
 				sol_i = i;
@@ -117,7 +117,7 @@ void LocalSearch::MultiEllipsoidalSearch() {
 			}
 		}
 	}
-	cout << "Most distant solutions have distance = " << max_dist << endl;
+	LOG(INFO) << "Most distant solutions have distance = " << max_dist;
 	ProblemSolution final_sol(Globals::instance());
 	LocalSearch::EllipsoidalSearch(pool[sol_i], pool[sol_j], 20, 1, 100, 10000, &final_sol);
 }

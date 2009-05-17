@@ -485,6 +485,14 @@
 				>
 			</File>
 			<File
+				RelativePath=".\EllipsoidalCut.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\EllipsoidalCut.h"
+				>
+			</File>
+			<File
 				RelativePath=".\SolverGeracaoColunas.cpp"
 				>
 			</File>

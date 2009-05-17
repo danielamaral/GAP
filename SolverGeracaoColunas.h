@@ -14,6 +14,7 @@ using namespace System::Diagnostics;
 #include "Globals.h"
 #include "ProblemSolution.h"
 #include "VariableGeracaoColunas.h"
+#include "EllipsoidalCut.h"
 #include "VnsCut.h"
 
 using namespace std;
@@ -74,6 +75,10 @@ class SolverGeracaoColunas : public VnsSolver {
   
   // Changes the sense of the constraint <cons_row> and updates the RHS side to <rhs>
   virtual void ReverseConstraint(int cons_row, int rhs);
+
+  virtual int AddEllipsoidalConstraint(const ProblemSolution& x1,
+                                       const ProblemSolution& x2,
+                                       int k);
 
 private:
   /********************************************************************
@@ -232,8 +237,9 @@ private:
   /** Hash which associates the row number with the Constraint object. */
   ConstraintGeracaoColunasHash cHash_;
 
-  /** Structure that keeps the added VNS constraints */
+  /** Structure that keeps the added VNS and Ellipsoidal constraints */
   vector<VnsCut> vns_cuts_;
+  vector<EllipsoidalCut> ellipsoidal_cuts_;
 
   static const int kMaxNumberColumns_ = 40000;
   static const int kNumColumnsToRemove_ = 10000;

@@ -9,6 +9,7 @@
 #include "ProblemSolution.h"
 #include "VariableFormulacaoPadrao.h"
 
+
 class SolverFormulacaoPadrao : public VnsSolver {
 public:
   SolverFormulacaoPadrao(ProblemData* problem_data);
@@ -52,7 +53,7 @@ public:
   // hand side to <rhs>
   void ReverseConstraint(int cons_row, int rhs);
     
-	int UpdateConsMaxAssignmentChangesEllipsoidal(
+	int AddEllipsoidalConstraint(
 		const ProblemSolution& x1, const ProblemSolution& x2, int k);
 	void ClearConsMaxAssignmentChangesEllipsoidal();
 

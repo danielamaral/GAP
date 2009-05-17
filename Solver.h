@@ -72,7 +72,8 @@ public:
 class SolverStatus {
 public:
 	SolverStatus() : status(-1), final_sol(Globals::instance()),
-		gap_relative(0.0), gap_absolute(0.0), time (0.0) { }
+		gap_relative(0.0), gap_absolute(0.0), time(0.0), total_num_nodes(0),
+    node_with_best_result(-1) { }
 
 	string ToString() {
 		stringstream ss;
@@ -155,4 +156,9 @@ class VnsSolver : public Solver {
   
   // Changes the sense of the constraint <cons_row> and updates the RHS side to <rhs>
   virtual void ReverseConstraint(int cons_row, int rhs) = 0;
+
+  // Adds an ellipsoidal constraint with solutions <x1> and <x2>
+  virtual int AddEllipsoidalConstraint(const ProblemSolution& x1,
+                                       const ProblemSolution& x2,
+                                       int k) = 0;
 };

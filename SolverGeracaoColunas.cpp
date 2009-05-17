@@ -772,9 +772,11 @@ double SolverGeracaoColunas::BB(const ProblemData& p,
   // também o ótimo para o problema inteiro. Não é mais necessário fazer B&B.
   if (num_integer_vars == p.num_machines() * p.num_tasks()) {
     *pct_tree_solved += pow(0.5, static_cast<double>(depth));
-    bool feasible = VnsCutUtil::IsValidFinalXijMatrix(vns_cuts_, x);
+    bool vns_feasible = VnsCutUtil::IsValidFinalXijMatrix(vns_cuts_, x);
+    bool ellipsoidal_feasible =
+        EllipsoidalCutUtil::IsValidFinalXijMatrix(ellipsoidal_cuts_, x);
 
-    if (feasible) {  // Se a solução encontrada satisfaz os cortes do VNS.
+    if (vns_feasible && ellipsoidal_feasible) {
       SetStatus(*status, OPTSTAT_FEASIBLE, status);
       if (best_solution->cost() == 0 || lp->getObjVal() < best_solution->cost()) {
         best_solution->Clear();
@@ -800,10 +802,16 @@ double SolverGeracaoColunas::BB(const ProblemData& p,
       VLOG(1) << "BB(" << depth << "): all integer: {pct_tree_solved: "
               << *pct_tree_solved << ", status: " << *status << "}";
       return new_lower_bound;
-    } else {
+    } else if (!vns_feasible) {
       SetStatus(*status, OPTSTAT_INFEASIBLE, status);
       VLOG(1) << "BB(" << depth << "): all integer: {pct_tree_solved: "
               << *pct_tree_solved << ", status: infeasible due to VNS cuts, "
+              << ", final status: " << *status << "}.";
+      return Globals::Infinity();
+    } else if (!vns_feasible) {
+      SetStatus(*status, OPTSTAT_INFEASIBLE, status);
+      VLOG(1) << "BB(" << depth << "): all integer: {pct_tree_solved: "
+              << *pct_tree_solved << ", status: infeasible due to Ellipsoidal cuts, "
               << ", final status: " << *status << "}.";
       return Globals::Infinity();
     }
@@ -1445,4 +1453,11 @@ void SolverGeracaoColunas::ReverseConstraint(int cons_row, int rhs) {
     cut->set_min_changes(cut->max_changes());
     cut->set_max_changes(-1);
   }
+}
+
+int SolverGeracaoColunas::AddEllipsoidalConstraint(const ProblemSolution& x1,
+                                                   const ProblemSolution& x2,
+                                                   int k) {
+  ellipsoidal_cuts_.push_back(EllipsoidalCut(x1, x2, k));
+  return ellipsoidal_cuts_.size() - 1;
 }

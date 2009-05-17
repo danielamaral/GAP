@@ -169,7 +169,7 @@ void SolverFormulacaoPadrao::ClearConsMaxAssignmentChangesEllipsoidal() {
 	}
 }
 
-int SolverFormulacaoPadrao::UpdateConsMaxAssignmentChangesEllipsoidal(
+int SolverFormulacaoPadrao::AddEllipsoidalConstraint(
 	const ProblemSolution& x1, const ProblemSolution& x2, int k) {
 	// calculates the alfa(x1, x2) - N + |intersection|
 	int alfa = problem_data_->n();
