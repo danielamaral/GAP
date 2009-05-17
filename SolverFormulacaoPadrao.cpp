@@ -174,41 +174,41 @@ int SolverFormulacaoPadrao::UpdateConsMaxAssignmentChangesEllipsoidal(
 	// calculates the alfa(x1, x2) - N + |intersection|
 	int alfa = problem_data_->n();
 	for (int i = 0; i < problem_data_->n(); ++i) {
-		if (x1.assignment(i) == x2.assignment(i))
-			++alfa;
+    if (x1.assignment(i) == x2.assignment(i))
+		  ++alfa;
 	}
 	int rhs = alfa - k;
 
-    // creates the constraint
-    ConstraintFormulacaoPadrao cons;
-    cons.set_type(ConstraintFormulacaoPadrao::C_MAX_ASSIGNMENT_CHANGES_ELLIPSOIDAL);
-    ConstraintFormulacaoPadraoHash::iterator cit = cHash_.find(cons);
-    int cons_row;
-    if (cit != cHash_.end()) {
-        // the constraint already exists, zero it
-        cons_row = cit->second;
-		ClearConsMaxAssignmentChangesEllipsoidal();
-        lp_->chgRHS(cons_row, rhs);
-    } else {
-        cons_row = lp_->getNumRows();
-        cHash_[cons] = lp_->getNumRows();
-        int nnz = problem_data_->n() * 2;
-        OPT_ROW row(nnz, OPT_ROW::GREATER, rhs, (char*) cons.ToString().c_str());
-        lp_->addRow(row);
-    }
+  // creates the constraint
+  ConstraintFormulacaoPadrao cons;
+  cons.set_type(ConstraintFormulacaoPadrao::C_MAX_ASSIGNMENT_CHANGES_ELLIPSOIDAL);
+  ConstraintFormulacaoPadraoHash::iterator cit = cHash_.find(cons);
+  int cons_row;
+  if (cit != cHash_.end()) {
+    // the constraint already exists, zero it
+    cons_row = cit->second;
+	  ClearConsMaxAssignmentChangesEllipsoidal();
+    lp_->chgRHS(cons_row, rhs);
+  } else {
+    cons_row = lp_->getNumRows();
+    cHash_[cons] = lp_->getNumRows();
+    int nnz = problem_data_->n() * 2;
+    OPT_ROW row(nnz, OPT_ROW::GREATER, rhs, (char*) cons.ToString().c_str());
+    lp_->addRow(row);
+  }
 
-    // for each task
-    for (int i = 0; i < problem_data_->n(); ++i) {
-		  // if the task is in the intersection
-		  if (x1.assignment(i) == x2.assignment(i)) {
-			  SetVariable(cons_row, i, x1.assignment(i), 2.0);
-		  } else {  // adds both x1_ij and x2_ij
-			  SetVariable(cons_row, i, x1.assignment(i), 1.0);
-			  SetVariable(cons_row, i, x2.assignment(i), 1.0);
-		  }
-    }
+  // for each task
+  for (int i = 0; i < problem_data_->n(); ++i) {
+	  // if the task is in the intersection
+	  if (x1.assignment(i) == x2.assignment(i)) {
+		  SetVariable(cons_row, i, x1.assignment(i), 2.0);
+	  } else {  // adds both x1_ij and x2_ij
+		  SetVariable(cons_row, i, x1.assignment(i), 1.0);
+		  SetVariable(cons_row, i, x2.assignment(i), 1.0);
+	  }
+  }
 
-    return 1;
+  return 1;
 }
 
 void SolverFormulacaoPadrao::RemoveConstraint(int cons_row) {

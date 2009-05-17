@@ -215,7 +215,8 @@ void LocalSearch::VNSBra(SolverFactory* solver_factory,
 
       // remove last two added constraints
       solver_diversification->RemoveConstraint(last_cons_greater);
-      solver_diversification->RemoveConstraint(last_cons_less);  
+      if (last_cons_greater != last_cons_less)
+        solver_diversification->RemoveConstraint(last_cons_less);  
 
       cont = false;
 			if (status.status == OPTSTAT_FEASIBLE || status.status == OPTSTAT_MIPOPTIMAL) {
@@ -327,7 +328,8 @@ uint64 LocalSearch::VNSIntensification(VnsSolver *solver_intensification,
 	for (int i = added_cons.size() - 1; i >= 0; --i) {
 		// remove all added constraints
     VLOG(3) << "VNSInt: removing " << i << "th constraint: " << added_cons[i];
-		solver_intensification->RemoveConstraint(added_cons[i]);
+    if (i == added_cons.size() - 1 || added_cons[i] != added_cons[i + 1])
+		  solver_intensification->RemoveConstraint(added_cons[i]);
 	}
 
   LOG(INFO) << "VNSInt: finished, returning time " << elapsed_time;

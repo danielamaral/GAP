@@ -148,7 +148,7 @@ void ProblemSolution::Exchange(int task1, int task2) {
 	assignment_[task2] = mach1;
 }
 
-bool ProblemSolution::operator ==(const ProblemSolution& sol) {
+bool ProblemSolution::operator ==(const ProblemSolution& sol) const {
     return assignment_ == sol.assignment_;
 }
 

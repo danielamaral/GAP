@@ -21,7 +21,7 @@ public:
     cut_off_value_ = Globals::Infinity();
     use_stabilization_ = true;
     max_time_ = -1;  // No time limit.
-    time_for_first_solution_ = 30;  // A standard initial value.
+    time_for_first_solution_ = 180;  // A standard initial value.
   }
 
   SolverOptions() {
@@ -40,7 +40,7 @@ public:
   void set_max_time(int t) { max_time_ = t; }
   void set_only_first_solution(bool v) { only_first_solution_ = v; }
   void set_use_stabilization(bool v) { use_stabilization_ = v; }
-  void set_time_for_first_solution(int t) { time_for_first_solution_ = (t > 0 ? t : 30); }
+  void set_time_for_first_solution(int t) { time_for_first_solution_ = (t > 0 ? t : 180); }
   void set_relative_time_for_first_solution(int instance_size) {
     time_for_first_solution_ = std::max(time_for_first_solution_,
                                         CalculateDefaultFirstSolutionTime(instance_size));
@@ -51,7 +51,7 @@ public:
     int min_instance_size = 5 * 100;
     int time_for_min_size = std::min(60, max_time_);  // 1 min
 
-    int max_instance_size = 40 * 1600;
+    int max_instance_size = 80 * 1600;
     int time_for_max_size =  std::min(std::max(time_for_min_size, (int)(max_time_ * 0.2)),
                                       60 * 60 * 24);  // max 24h
 

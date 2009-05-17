@@ -720,7 +720,7 @@ double SolverGeracaoColunas::BB(const ProblemData& p,
 
 
   // TODO(danielrocha): move parameters to a better place
-  static const int kMaxDepthFixingVars_ = 0;
+  static const int kMaxDepthFixingVars_ = 4;
   static const int kNumberOfLookupsFixingVars_[] = { 10, 8, 6, 4 };
   //static const int kNumberOfLookupsFixingVars_[] = { 15, 5, 3, 2 };
   //static const int kNumberOfLookupsFixingVars_[] = { 4, 3, 2, 1 };
@@ -737,8 +737,8 @@ double SolverGeracaoColunas::BB(const ProblemData& p,
                           x, cut_off_value, lp, best_solution, fixed_vars, num_columns,
                           &fixed_machine, &fixed_task);
   } else {
-    VLOG(2) << "BB(" << depth << "): selecting variables using heuristic.";
-    double bestVal = 0.0;
+    VLOG(2) << "BB(" << depth << "): selecting variables using randomized heuristic.";
+    set<FixingCandidate> candidates;
     for (int machine = 0; machine < p.num_machines(); ++machine)
       for (int task = 0; task < p.num_tasks(); ++task)
         if (x[machine][task] > 1.0 - Globals::EPS() ||
@@ -749,13 +749,21 @@ double SolverGeracaoColunas::BB(const ProblemData& p,
             current_cost += p.cost(machine, task);
           }
         } else {
-          double heuristic_eval = EvaluateVariableToFix(x[machine][task]);
-          if (bestVal < heuristic_eval) {
-            bestVal = heuristic_eval;
-            fixed_machine = machine;
-            fixed_task = task;
-          }
+          FixingCandidate cand;
+          cand.machine = machine;
+          cand.task = task;
+          cand.value = EvaluateVariableToFix(x[machine][task]);
+          candidates.insert(cand);
+          if (candidates.size() > 10)
+            candidates.erase(candidates.begin());
         }
+    // Randomly selects from the candidates
+    if (candidates.size() > 0) {
+      vector<FixingCandidate> v(candidates.begin(), candidates.end());
+      int c = Globals::rg()->IRandom(0, candidates.size() - 1);
+      fixed_machine = v[c].machine;
+      fixed_task = v[c].task;
+    }
   }
   VLOG(1) << "BB(" << depth << "): fixed task: " << fixed_task << " and machine: "
           << fixed_machine;
@@ -1391,10 +1399,16 @@ int SolverGeracaoColunas::Solve(const SolverOptions& options,
 
 int SolverGeracaoColunas::AddConsMaxAssignmentChanges(
     const ProblemSolution& sol, int num_changes) {
-  VnsCut cut;
-  cut.set_max_changes(num_changes);
-  cut.set_solution(sol);
-  vns_cuts_.push_back(cut);
+  if (vns_cuts_.size() > 0 &&
+      vns_cuts_[vns_cuts_.size() - 1].solution() == sol) {
+    vns_cuts_[vns_cuts_.size() - 1].set_max_changes(num_changes);
+  } else {
+    VnsCut cut;
+    cut.set_max_changes(num_changes);
+    cut.set_solution(sol);
+    vns_cuts_.push_back(cut);
+  }
+
   return vns_cuts_.size() - 1;
 }
 
@@ -1409,10 +1423,15 @@ int SolverGeracaoColunas::AddConsMinAssignmentChanges(
 
 // Removes the constraint <cons_row> or the range [cons_row_begin, cons_row_end]
 void SolverGeracaoColunas::RemoveConstraint(int cons_row) {
+  CHECK_GE(cons_row, 0);
+  CHECK_LT(cons_row, vns_cuts_.size());
   vns_cuts_.erase(vns_cuts_.begin() + cons_row);
 }
 
 void SolverGeracaoColunas::RemoveConstraint(int cons_row_begin, int cons_row_end) {
+  CHECK_GE(cons_row_begin, 0);
+  CHECK_LE(cons_row_begin, cons_row_end);
+  CHECK_LT(cons_row_end, vns_cuts_.size());
   vns_cuts_.erase(vns_cuts_.begin() + cons_row_begin, vns_cuts_.begin() + cons_row_end + 1);
 }
 

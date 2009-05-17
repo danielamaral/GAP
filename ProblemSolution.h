@@ -67,7 +67,7 @@ public:
    bool IsValidExchange(int task1, int task2) const;
    void Exchange(int task1, int task2);
 
-   bool operator==(const ProblemSolution& sol);
+   bool operator==(const ProblemSolution& sol) const;
 private:
 
 	/**

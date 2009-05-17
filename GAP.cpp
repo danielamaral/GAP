@@ -74,6 +74,8 @@ int main(int argc, char* argv[]) {
   options.set_max_time(max_time);
   options.set_relative_time_for_first_solution(Globals::instance()->n() *
                                                Globals::instance()->m());
+  if (upper_bound > 0)
+    options.set_cut_off_value(upper_bound);
   options.set_use_stabilization(true);
 
 	// Solver and input options
