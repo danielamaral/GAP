@@ -630,7 +630,7 @@ double SolverGeracaoColunas::BB(const ProblemData& p,
   // Se o melhor LB encontrado for maior que a melhor solução encontrada
   //if (new_lower_bound >= cut_off_value - 1.0 + Globals::BigEPS()) {
   if (new_lower_bound > cut_off_value || new_lower_bound == Globals::Infinity()) {
-    *pct_tree_solved += pow(1.0 / p.num_machines(), static_cast<double>(depth));
+    *pct_tree_solved += pow(0.5, static_cast<double>(depth));
     // TODO(danielrocha): isso ta certo?
     //if (*pct_tree_solved >= 1.0 - Globals::EPS()) {
     //  // Se a porcentagem do BB já resolvido for >= 1 ajusta resposta
@@ -720,7 +720,7 @@ double SolverGeracaoColunas::BB(const ProblemData& p,
 
 
   // TODO(danielrocha): move parameters to a better place
-  static const int kMaxDepthFixingVars_ = 0;
+  static const int kMaxDepthFixingVars_ = 4;
   static const int kNumberOfLookupsFixingVars_[] = { 10, 8, 6, 4 };
   //static const int kNumberOfLookupsFixingVars_[] = { 15, 5, 3, 2 };
   //static const int kNumberOfLookupsFixingVars_[] = { 4, 3, 2, 1 };
@@ -730,7 +730,6 @@ double SolverGeracaoColunas::BB(const ProblemData& p,
   double current_cost = 0.0;
   int fixed_machine = -1;
   int fixed_task = -1;
-  vector<int> remaining(p.num_machines(), 0);
   if(depth < kMaxDepthFixingVars_) {
     VLOG(2) << "BB(" << depth << "): calling SelectFixedVariables to select variables.";
     num_integer_vars =
@@ -740,8 +739,7 @@ double SolverGeracaoColunas::BB(const ProblemData& p,
   } else {
     VLOG(2) << "BB(" << depth << "): selecting variables using randomized heuristic.";
     set<FixingCandidate> candidates;
-    for (int machine = 0; machine < p.num_machines(); ++machine) {
-      remaining[machine] = p.capacity(machine);
+    for (int machine = 0; machine < p.num_machines(); ++machine)
       for (int task = 0; task < p.num_tasks(); ++task)
         if (x[machine][task] > 1.0 - Globals::EPS() ||
             x[machine][task] < Globals::EPS()) {
@@ -749,7 +747,6 @@ double SolverGeracaoColunas::BB(const ProblemData& p,
           if (x[machine][task] > 1.0 - Globals::EPS()) {
             ++num_variables_on_one;
             current_cost += p.cost(machine, task);
-            remaining[machine] -= p.consume(machine, task);
           }
         } else {
           FixingCandidate cand;
@@ -760,7 +757,6 @@ double SolverGeracaoColunas::BB(const ProblemData& p,
           if (candidates.size() > 10)
             candidates.erase(candidates.begin());
         }
-    }
     // Randomly selects from the candidates
     if (candidates.size() > 0) {
       vector<FixingCandidate> v(candidates.begin(), candidates.end());
@@ -775,7 +771,7 @@ double SolverGeracaoColunas::BB(const ProblemData& p,
   // Se a solução ótima do problema linear é composta de variáveis inteiras, ela é
   // também o ótimo para o problema inteiro. Não é mais necessário fazer B&B.
   if (num_integer_vars == p.num_machines() * p.num_tasks()) {
-    *pct_tree_solved += pow(1.0 / p.num_machines(), static_cast<double>(depth));
+    *pct_tree_solved += pow(0.5, static_cast<double>(depth));
     bool vns_feasible = VnsCutUtil::IsValidFinalXijMatrix(vns_cuts_, x);
     bool ellipsoidal_feasible =
         EllipsoidalCutUtil::IsValidFinalXijMatrix(ellipsoidal_cuts_, x);
@@ -847,52 +843,38 @@ double SolverGeracaoColunas::BB(const ProblemData& p,
   VLOG(2) << "BB(" << depth << "): number of integer variables: "
           << num_integer_vars << ", new cutoff: " << new_cut_off_value;
 
-  vector<pair<double, int> > machines_to_fix(p.num_machines(), make_pair(0.0, 0));
-  for (int machine = 0; machine < p.num_machines(); ++machine) {
-    double cost = static_cast<double>(p.cost(machine, fixed_task)) /
-        p.consume(machine, fixed_task);
-    machines_to_fix[machine] = make_pair(cost, machine);
+  if (VnsCutUtil::CanFixCandidate(vns_cuts_, *fixed_vars, fixed_machine,
+                                  fixed_task, FIX_ON_ONE)) {
+    FixVariableAndContinueBB(FIX_ON_ONE,
+                             fixed_machine,
+                             fixed_task,
+                             num_nodes_limit,
+                             new_lower_bound,
+                             new_cut_off_value,
+                             first_only,
+                             p,
+                             lp,
+                             best_solution,
+                             fixed_vars,
+                             num_columns,
+                             depth,
+                             pct_tree_solved,
+                             num_visited_nodes,
+                             status);
+  } else {
+    *pct_tree_solved += pow(0.5, static_cast<double>(depth + 1));
+    VLOG(1) << "BB(" << depth << "): unable to fix var due to VNS cuts, task: "
+            << fixed_task << ", machine: " << fixed_machine << ", sense: " << FIX_ON_ONE
+            << ", pct tree: " << *pct_tree_solved;
   }
-  sort(machines_to_fix.begin(), machines_to_fix.end());
 
-  for (int m = 0; m < p.num_machines(); ++m) {
-    int machine = machines_to_fix[m].second;
-    if (remaining[machine] + p.consume(machine, fixed_task) <= p.capacity(machine) &&
-        VnsCutUtil::CanFixCandidate(vns_cuts_, *fixed_vars, machine,
-                                    fixed_task, FIX_ON_ONE)) {
-        VLOG(1) << "Fixing machine " << machine << " to task " << fixed_task;
-        FixVariableAndContinueBB(FIX_ON_ONE,
-                                 machine,
-                                 fixed_task,
-                                 num_nodes_limit,
-                                 new_lower_bound,
-                                 new_cut_off_value,
-                                 first_only,
-                                 p,
-                                 lp,
-                                 best_solution,
-                                 fixed_vars,
-                                 num_columns,
-                                 depth,
-                                 pct_tree_solved,
-                                 num_visited_nodes,
-                                 status);
-    } else {
-      *pct_tree_solved += pow(1.0 / static_cast<double>(p.num_machines()),
-                              static_cast<double>(depth + 1));
-      VLOG(1) << "BB(" << depth << "): unable to fix var due to cuts, task: "
-              << fixed_task << ", machine: " << machine << ", sense: " << FIX_ON_ONE
-              << ", pct tree: " << *pct_tree_solved;
-    }
-
-    if (TimeExpired()) {
-      SetStatus(*status, OPTSTAT_NOINTEGER, status);
-      VLOG(1) << "BB(" << depth << "): time expired (after FixAndContinue), returning "
-              << new_lower_bound << ", status: " << *status;
-      return new_lower_bound;
-    }
+  if (TimeExpired()) {
+    SetStatus(*status, OPTSTAT_NOINTEGER, status);
+    VLOG(1) << "BB(" << depth << "): time expired (after FixAndContinue), returning "
+            << new_lower_bound << ", status: " << *status;
+    return new_lower_bound;
   }
-  /*
+
   if (VnsCutUtil::CanFixCandidate(vns_cuts_, *fixed_vars, fixed_machine,
                                   fixed_task, FIX_ON_ZERO)) {
     FixVariableAndContinueBB(FIX_ON_ZERO,
@@ -916,7 +898,7 @@ double SolverGeracaoColunas::BB(const ProblemData& p,
     VLOG(1) << "BB(" << depth << "): unable to fix var due to VNS cuts, task: "
             << fixed_task << ", machine: " << fixed_machine << ", sense: " << FIX_ON_ZERO
             << ", pct tree: " << *pct_tree_solved;
-  }*/
+  }
 
   if (*pct_tree_solved >= 1.0 - Globals::EPS()) {
     if (*status == OPTSTAT_FEASIBLE && !first_only)
