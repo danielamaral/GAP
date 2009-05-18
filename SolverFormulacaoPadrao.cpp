@@ -329,9 +329,9 @@ void SolverFormulacaoPadrao::Init(const SolverOptions& options) {
   lp_->setMIPRelTol(0.00);
 	lp_->setMIPAbsTol(0.00);
   
-  // Maximum 1.5 gigs, store the rest on disk (uncompressed).
-  lp_->setWorkMem(1200);
-  lp_->setTreLim(1500);
+  // Maximum 3.5 gigs, store the rest on disk (uncompressed).
+  lp_->setWorkMem(3200);
+  lp_->setTreLim(3500);
   lp_->setNodeFileInd(2);
 
   /** creates the variables */

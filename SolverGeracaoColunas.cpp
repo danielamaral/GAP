@@ -325,6 +325,8 @@ double SolverGeracaoColunas::GenerateColumns(const ProblemData& p,
     // Custos reduzidos calculados a partir da solução da mochila
     vector<double> reduced_costs(p.num_machines());
     vector<int> prices(p.num_tasks());
+    vector<short> used_tasks(p.num_tasks());
+    vector<int> consume_vector(p.num_tasks());
 
     // Tenta gerar uma coluna para cada máquina
     for (int machine = 0; machine < p.num_machines(); ++machine) {
@@ -332,60 +334,70 @@ double SolverGeracaoColunas::GenerateColumns(const ProblemData& p,
 
       // Os precos de cada tarefa para o problema da mochila, ajustados
       // em relação à fixação ou não das variáveis.
+      int num_usable_tasks = 0;
       for (int task = 0; task < p.num_tasks(); ++task) {
-        prices[task] = (static_cast<int>(dual_values[task] * 100.0) -
-                        (p.cost(machine, task) * 100));
+        int price =
+            (static_cast<int>(dual_values[task] * 100.0) - (p.cost(machine, task) * 100));
 
         // Se o preco for negativo ou a alocacao maquina/tarefa ja
         // estiver fixada em zero, o preco é zero.
-        if(prices[task] < 0 || (*fixed_vars)[machine][task] == 0)
-          prices[task] = 0;
+        if ((*fixed_vars)[machine][task] == 0)
+          price = 0;
 
         // Se a alocacao maquina/tarefa ja estiver fixada em um,
         // o preco é zero e diminuimos a capacidade da maquina.
         if((*fixed_vars)[machine][task] == 1) {
-          prices[task] = 0;
+          price = 0;
           used_capacity += p.consume(machine, task);
+        }
+
+        if (price > 0) {
+          prices[num_usable_tasks] = price;
+          used_tasks[num_usable_tasks] = task;
+          consume_vector[num_usable_tasks] = p.consume(machine, task);
+          ++num_usable_tasks;
         }
       }
 
-      vector<int> knapsack_result(p.num_tasks());
-      int knapsack_value = minknap(p.num_tasks(), &prices[0],
-                                   const_cast<int*>(p.GetConsumeVector(machine)),
+      vector<int> knapsack_result(num_usable_tasks);
+      int knapsack_value = minknap(num_usable_tasks, &prices[0],
+                                   const_cast<int*>(&consume_vector[0]),
                                    &knapsack_result[0],
                                    p.capacity(machine) - used_capacity);
 
       // Adiciona à solução encontrada as variáveis fixadas
       for(int task = 0; task < p.num_tasks(); ++task) {
-        if (prices[task] == 0 || (*fixed_vars)[machine][task] == 0)
-          knapsack_result[task] = 0;
-        if ((*fixed_vars)[machine][task] == 1)
-          knapsack_result[task] = 1;
+        if ((*fixed_vars)[machine][task] == 1) {
+          used_tasks[num_usable_tasks++] = task;
+          knapsack_result.push_back(1);
+        }
       }
 
       double knapsack_price = 0.0;
-      for(int task = 0; task < p.num_tasks(); ++task) {
-        knapsack_price += dual_values[task] * knapsack_result[task];
+      int assignment_cost = 0;
+      int assignment_consume = 0;
+      for(int task_idx = 0; task_idx < num_usable_tasks; ++task_idx) {
+        const short& task = used_tasks[task_idx];
+        if (knapsack_result[task_idx] > 0) {
+          knapsack_price += dual_values[task];
+          assignment_cost += p.cost(machine, task);
+          assignment_consume += p.consume(machine, task);
+        }
       }
       knapsack_price += dual_values[p.num_tasks() + machine];
 
-      reduced_costs[machine] =
-        p.AssignmentCost(machine, knapsack_result) - knapsack_price;
+      reduced_costs[machine] = assignment_cost - knapsack_price;
 
       // Se a coluna gerada tem custo reduzido negativo, adiciona à solução
       if(reduced_costs[machine] < -Globals::EPS()) {
-        CHECK_LE(p.AssignmentConsume(machine, knapsack_result), p.capacity(machine))
+        CHECK_LE(assignment_consume, p.capacity(machine))
           << "The knapsack solution consumes more than the machine capacity!";
 
         generated_and_added_column = true;
         // Adiciona a nova coluna, com valor na função objetivo igual ao custo
         // da resposta da mochila.
-        vector<short> knapsack_tasks;
-        for (short task = 0; task < p.num_tasks(); ++task)
-          if (knapsack_result[task] > 0)
-            knapsack_tasks.push_back(task);
-        AddNewColumnWithTasks(p.AssignmentCost(machine, knapsack_result), 0.0, OPT_INF,
-                              machine, knapsack_tasks, &vContainer_, lp);
+        AddNewColumnWithTasks(assignment_cost, 0.0, OPT_INF,
+                              machine, used_tasks, &vContainer_, lp);
         *num_columns += 1;
 
         VLOG_EVERY_N(4, 197)
