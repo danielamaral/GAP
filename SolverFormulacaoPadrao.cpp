@@ -324,15 +324,16 @@ void SolverFormulacaoPadrao::GenerateSolution(ProblemSolution* sol) {
 void SolverFormulacaoPadrao::Init(const SolverOptions& options) {
   /** creates the problem */
   lp_->createLP("FormulacaoPadrao", OPTSENSE_MINIMIZE, PROB_MIP);
-  lp_->setMIPScreenLog(0);
-  lp_->setMIPEmphasis(0);
+  lp_->setMIPScreenLog(2);
   lp_->setMIPRelTol(0.00);
 	lp_->setMIPAbsTol(0.00);
   
-  // Maximum 3.5 gigs, store the rest on disk (uncompressed).
-  lp_->setWorkMem(3200);
-  lp_->setTreLim(3500);
+  // Maximum 2.8 gigs, store the rest on disk (uncompressed).
+  lp_->setWorkMem(2800);
+  lp_->setTreLim(10000);
   lp_->setNodeFileInd(2);
+  if (problem_data_->num_tasks() >= 1600)
+    lp_->setMemoryEmphasis(true);
 
   /** creates the variables */
   CreateVarTaskAssignment(*problem_data_, OPT_COL::VAR_BINARY, &vHash_, lp_);

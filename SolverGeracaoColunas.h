@@ -241,8 +241,8 @@ private:
   vector<VnsCut> vns_cuts_;
   vector<EllipsoidalCut> ellipsoidal_cuts_;
 
-  static const int kMaxNumberColumns_ = 40000;
-  static const int kNumColumnsToRemove_ = 10000;
+  static const int kMaxNumberColumns_ = 100000;
+  static const int kNumColumnsToRemove_ = 20000;
 };
 
 class SolverGeracaoColunasFactory : public SolverFactory {

@@ -150,6 +150,7 @@
 				HeapCommitSize="0"
 				StackReserveSize="10485760"
 				StackCommitSize="262144"
+				LargeAddressAware="2"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
 				TargetMachine="1"

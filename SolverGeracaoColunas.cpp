@@ -48,12 +48,17 @@ void SolverGeracaoColunas::Init(const SolverOptions& options) {
   // seja, vamos fazer B&B para buscar a solução ótima.
   lp_ = new OPT_CPLEX;
   lp_->createLP("FormulacaoGeracaoColunas", OPTSENSE_MINIMIZE, PROB_LP);
-  //lp->setMIPScreenLog();
-  //lp->setScreenLog(1);
+  //lp_->setMIPScreenLog(1);
+  //lp_->setScreenLog(1);
   //lp->setSimplexScreenLog(1);
-  lp_->setMIPEmphasis(0);
+  //lp_->setMIPEmphasis(0);
   lp_->setMIPRelTol(0.00);
 	lp_->setMIPAbsTol(0.00);
+
+  // Maximum 3 gigs, store the rest on disk (uncompressed).
+  lp_->setWorkMem(2800);
+  lp_->setTreLim(5000);
+  lp_->setNodeFileInd(2);
 
   // Adiciona as restricoes ao LP.
   AddSumAssignmentsPerTaskEqualsOneConstraints(*problem_data_, &cHash_, lp_);
@@ -195,8 +200,7 @@ void SolverGeracaoColunas::RemoveExcessColumns(
     // Só queremos remover as colunas geradas
     if (var.type() == VariableGeracaoColunas::COL) {
       int index = v;
-      double cost = reduced_costs[index];
-      cost_and_index.push_back(make_pair(cost, index));
+      cost_and_index.push_back(make_pair(reduced_costs[index], index));
     }
   }
 
@@ -206,17 +210,18 @@ void SolverGeracaoColunas::RemoveExcessColumns(
 
   int removed_columns = min<int>(num_columns_to_remove, cost_and_index.size());
   vector<int> removed_indices(removed_columns);
-  vector<VariableGeracaoColunasContainer::iterator> removed_itr(removed_columns);
   for (int i = 0; i < removed_columns; ++i) {
     removed_indices[i] = cost_and_index[i].second;
-    removed_itr[i] = (vContainer->begin() + removed_indices[i]);
   }
+  sort(removed_indices.begin(), removed_indices.end());
 
   VLOG(2) << "RemoveExcessColumns: removing excessive columns from LP and vContainer.";
   lp->delSetCols(removed_columns, &removed_indices[0]);
   for (int i = removed_columns - 1; i >= 0; --i) {
-    RemoveColumnTasksFromMap(removed_itr[i]->column().index());
-    vContainer->erase(removed_itr[i]);
+    VariableGeracaoColunasContainer::iterator removed_itr =
+        (vContainer->begin() + removed_indices[i]);
+    RemoveColumnTasksFromMap(removed_itr->column().index());
+    vContainer->erase(removed_itr);
   }
 }
 
