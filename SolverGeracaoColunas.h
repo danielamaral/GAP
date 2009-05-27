@@ -93,7 +93,7 @@ private:
                     vector<vector<double> >* x) const;
 
   /// Utility functions to deal with the mapping of column indices to task lists.
-  void AddTasksToColumnMap(int column_index, const vector<short>& tasks);
+  void AddTasksToColumnMap(int column_index, int num_tasks, short* tasks);
   const vector<short>& GetColumnTasks(int column_index) const;
   void RemoveColumnTasksFromMap(int column_index);
 
@@ -105,7 +105,7 @@ private:
   *********************************************************************/
 
   void AddNewColumnWithTasks(double cost, double lower_bound, double upper_bound,
-                             int machine, const vector<short>& tasks,
+                             int machine, int num_tasks, short* tasks,
                              VariableGeracaoColunasContainer* vContainer, OPT_LP* lp);
 
   void AddNewColumnReuseTasks(const VariableGeracaoColunas& var,

@@ -119,8 +119,8 @@ void SolverGeracaoColunas::GetXijMatrix(
 }
 
 void SolverGeracaoColunas::AddTasksToColumnMap(int column_index,
-                                               const vector<short>& tasks) {
-  column_map_[column_index] = tasks;
+                                               int num_tasks, short* tasks) {
+  column_map_[column_index] = vector<short>(tasks, tasks + num_tasks);
 }
 
 const vector<short>& SolverGeracaoColunas::GetColumnTasks(int column_index) const {
@@ -329,9 +329,22 @@ double SolverGeracaoColunas::GenerateColumns(const ProblemData& p,
     
     // Custos reduzidos calculados a partir da solução da mochila
     vector<double> reduced_costs(p.num_machines());
-    vector<int> prices(p.num_tasks());
+
+    // Precos, consumo e numero da tarefa, um elemento para cada tarefa
+    // com preco positivo.
+    vector<int> prices(p.num_tasks()), consume_vector(p.num_tasks());
     vector<short> used_tasks(p.num_tasks());
-    vector<int> consume_vector(p.num_tasks());
+    // Resultado do knapsack.
+    vector<int> knapsack_result(p.num_tasks());
+    // Tarefas utilizadas no knapsack.
+    vector<short> knapsack_tasks(p.num_tasks());
+
+    // Reserva os vetores, para que não seja necessário re-alocalos.
+    prices.reserve(p.num_tasks());
+    consume_vector.reserve(p.num_tasks());
+    used_tasks.reserve(p.num_tasks());
+    knapsack_result.reserve(p.num_tasks());
+    knapsack_tasks.reserve(p.num_tasks());
 
     // Tenta gerar uma coluna para cada máquina
     for (int machine = 0; machine < p.num_machines(); ++machine) {
@@ -341,8 +354,8 @@ double SolverGeracaoColunas::GenerateColumns(const ProblemData& p,
       // em relação à fixação ou não das variáveis.
       int num_usable_tasks = 0;
       for (int task = 0; task < p.num_tasks(); ++task) {
-        int price =
-            (static_cast<int>(dual_values[task] * 100.0) - (p.cost(machine, task) * 100));
+        int price = static_cast<int>(dual_values[task] * 100.0) -
+                    (p.cost(machine, task) * 100);
 
         // Se o preco for negativo ou a alocacao maquina/tarefa ja
         // estiver fixada em zero, o preco é zero.
@@ -364,7 +377,6 @@ double SolverGeracaoColunas::GenerateColumns(const ProblemData& p,
         }
       }
 
-      vector<int> knapsack_result(num_usable_tasks);
       int knapsack_value = minknap(num_usable_tasks, &prices[0],
                                    const_cast<int*>(&consume_vector[0]),
                                    &knapsack_result[0],
@@ -373,20 +385,23 @@ double SolverGeracaoColunas::GenerateColumns(const ProblemData& p,
       // Adiciona à solução encontrada as variáveis fixadas
       for(int task = 0; task < p.num_tasks(); ++task) {
         if ((*fixed_vars)[machine][task] == 1) {
-          used_tasks[num_usable_tasks++] = task;
-          knapsack_result.push_back(1);
+          used_tasks[num_usable_tasks] = task;
+          knapsack_result[num_usable_tasks] = 1;
+          ++num_usable_tasks;
         }
       }
 
       double knapsack_price = 0.0;
       int assignment_cost = 0;
       int assignment_consume = 0;
+      int num_used_tasks_in_knapsack = 0;
       for(int task_idx = 0; task_idx < num_usable_tasks; ++task_idx) {
         const short& task = used_tasks[task_idx];
         if (knapsack_result[task_idx] > 0) {
           knapsack_price += dual_values[task];
           assignment_cost += p.cost(machine, task);
           assignment_consume += p.consume(machine, task);
+          knapsack_tasks[num_used_tasks_in_knapsack++] = task;
         }
       }
       knapsack_price += dual_values[p.num_tasks() + machine];
@@ -401,8 +416,9 @@ double SolverGeracaoColunas::GenerateColumns(const ProblemData& p,
         generated_and_added_column = true;
         // Adiciona a nova coluna, com valor na função objetivo igual ao custo
         // da resposta da mochila.
-        AddNewColumnWithTasks(assignment_cost, 0.0, OPT_INF,
-                              machine, used_tasks, &vContainer_, lp);
+        AddNewColumnWithTasks(assignment_cost, 0.0, OPT_INF, machine,
+                              num_used_tasks_in_knapsack, &knapsack_tasks[0],
+                              &vContainer_, lp);
         *num_columns += 1;
 
         VLOG_EVERY_N(4, 197)
@@ -1233,18 +1249,19 @@ void SolverGeracaoColunas::AddIntegerSolutionColumnsWithCoeficients(
     vector<short> tasks_assigned;
     int_sol.GetMachineAssignments(mac, &tasks_assigned);
     AddNewColumnWithTasks(int_sol.AssignmentCost(mac), 0.0, OPT_INF,
-                          mac, tasks_assigned, &vContainer_, lp);
+                          mac, tasks_assigned.size(), &tasks_assigned[0],
+                          &vContainer_, lp);
   }
 }
 
 void SolverGeracaoColunas::AddNewColumnWithTasks(
     double cost, double lower_bound,
     double upper_bound, int machine,
-    const vector<short>& tasks,
+    int num_tasks, short* tasks,
     VariableGeracaoColunasContainer* vContainer,
     OPT_LP* lp) {
   Column column(machine, column_count_);
-  AddTasksToColumnMap(column_count_, tasks);
+  AddTasksToColumnMap(column_count_, num_tasks, tasks);
 
   VariableGeracaoColunas var;
   var.set_type(VariableGeracaoColunas::COL);
@@ -1256,13 +1273,12 @@ void SolverGeracaoColunas::AddNewColumnWithTasks(
   vContainer->push_back(var);
   lp->newCol(OPT_COL(OPT_COL::VAR_CONTINUOUS, var.cost(), lower_bound, upper_bound),
              var.ToString().c_str());
-             //NULL);
              
   CHECK_EQ(vContainer->size(), lp->getNumCols());
 
   // TODO(danielrocha): maybe look for the constraints in the hash
   lp->chgCoef(problem_data_->num_tasks() + machine, column_index, 1.0);
-  for(int task_idx = 0; task_idx < static_cast<int>(tasks.size()); ++task_idx)
+  for(int task_idx = 0; task_idx < num_tasks; ++task_idx)
     lp->chgCoef(tasks[task_idx], column_index, 1.0);
 
   column_count_++;
@@ -1387,7 +1403,7 @@ int SolverGeracaoColunas::Solve(const SolverOptions& options,
     VLOG(1) << "Generated first set of columns: " << lp_->getObjVal();
   }
 
-  VLOG(1) << "Cut_off value: " << options.cut_off_value();
+  VLOG(1) << "Cut_off value: " << options.cut_off_value() << ", first sol: " << sol->cost();
 
   if ((!options.only_first_solution() || vns_cuts_.size() > 0) &&
        output_status->status != OPTSTAT_MIPOPTIMAL) {

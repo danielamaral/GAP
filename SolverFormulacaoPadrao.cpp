@@ -3,6 +3,7 @@
 #include <iostream>
 #include <cassert>
 
+#include "logging.h"
 #include "opt_cplex.h"
 #include "ProblemData.h"
 
@@ -324,16 +325,25 @@ void SolverFormulacaoPadrao::GenerateSolution(ProblemSolution* sol) {
 void SolverFormulacaoPadrao::Init(const SolverOptions& options) {
   /** creates the problem */
   lp_->createLP("FormulacaoPadrao", OPTSENSE_MINIMIZE, PROB_MIP);
-  lp_->setMIPScreenLog(2);
+  for (int i = 5; i >= 0; --i) {
+    if (VLOG_IS_ON(i)) {
+      lp_->setMIPScreenLog(i);
+      break;
+    }
+  }
   lp_->setMIPRelTol(0.00);
 	lp_->setMIPAbsTol(0.00);
   
   // Maximum 2.8 gigs, store the rest on disk (uncompressed).
-  lp_->setWorkMem(2800);
+  lp_->setWorkMem(3000);
   lp_->setTreLim(10000);
   lp_->setNodeFileInd(2);
-  if (problem_data_->num_tasks() >= 1600)
+  //if (problem_data_->num_tasks() >= 1600) {
+    // Precisamos evitar esgotar a memória.
+    lp_->setNodeSel(0);
+    //lp_->setVarSel(3);  // Strong branching.
     lp_->setMemoryEmphasis(true);
+  //}
 
   /** creates the variables */
   CreateVarTaskAssignment(*problem_data_, OPT_COL::VAR_BINARY, &vHash_, lp_);
