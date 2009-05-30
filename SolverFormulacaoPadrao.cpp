@@ -336,12 +336,12 @@ void SolverFormulacaoPadrao::Init(const SolverOptions& options) {
   
   // Maximum 2.8 gigs, store the rest on disk (uncompressed).
   lp_->setWorkMem(3000);
-  lp_->setTreLim(10000);
+  lp_->setTreLim(20000);
   lp_->setNodeFileInd(2);
   //if (problem_data_->num_tasks() >= 1600) {
     // Precisamos evitar esgotar a memória.
-    lp_->setNodeSel(0);
-    //lp_->setVarSel(3);  // Strong branching.
+    //lp_->setNodeSel(0);
+    lp_->setVarSel(3);  // Strong branching.
     lp_->setMemoryEmphasis(true);
   //}
 
