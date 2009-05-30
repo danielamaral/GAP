@@ -5,7 +5,7 @@ class ProblemData;
 class ProblemSolution;
 
 namespace ConstructiveHeuristics {
-    void RandomStupid(const ProblemData& pd, ProblemSolution* sol);
+  void RandomStupid(const ProblemData& pd, ProblemSolution* sol);
 };
 
 #endif

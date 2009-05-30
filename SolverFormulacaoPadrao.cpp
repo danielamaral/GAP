@@ -171,14 +171,8 @@ void SolverFormulacaoPadrao::ClearConsMaxAssignmentChangesEllipsoidal() {
 }
 
 int SolverFormulacaoPadrao::AddEllipsoidalConstraint(
-	const ProblemSolution& x1, const ProblemSolution& x2, int k) {
-	// calculates the alfa(x1, x2) - N + |intersection|
-	int alfa = problem_data_->n();
-	for (int i = 0; i < problem_data_->n(); ++i) {
-    if (x1.assignment(i) == x2.assignment(i))
-		  ++alfa;
-	}
-	int rhs = alfa - k;
+	const vector<ProblemSolution*>& x, OPT_ROW::ROWSENSE constraint_sense, int F) {
+	int RHS = problem_data_->n() * x.size() - F;
 
   // creates the constraint
   ConstraintFormulacaoPadrao cons;
@@ -189,24 +183,30 @@ int SolverFormulacaoPadrao::AddEllipsoidalConstraint(
     // the constraint already exists, zero it
     cons_row = cit->second;
 	  ClearConsMaxAssignmentChangesEllipsoidal();
-    lp_->chgRHS(cons_row, rhs);
+    lp_->chgSense(cons_row, constraint_sense);
+    lp_->chgRHS(cons_row, RHS);
   } else {
     cons_row = lp_->getNumRows();
     cHash_[cons] = lp_->getNumRows();
     int nnz = problem_data_->n() * 2;
-    OPT_ROW row(nnz, OPT_ROW::GREATER, rhs, (char*) cons.ToString().c_str());
+    OPT_ROW row(nnz, constraint_sense, RHS, (char*) cons.ToString().c_str());
     lp_->addRow(row);
   }
 
   // for each task
-  for (int i = 0; i < problem_data_->n(); ++i) {
-	  // if the task is in the intersection
-	  if (x1.assignment(i) == x2.assignment(i)) {
-		  SetVariable(cons_row, i, x1.assignment(i), 2.0);
-	  } else {  // adds both x1_ij and x2_ij
-		  SetVariable(cons_row, i, x1.assignment(i), 1.0);
-		  SetVariable(cons_row, i, x2.assignment(i), 1.0);
-	  }
+  for (int task = 0; task < problem_data_->n(); ++task) {
+    // counts the weight of every machine assignment
+    map<int, int> machine_to_counts;
+    for (int sol = 0; sol < x.size(); ++sol) {
+      machine_to_counts[x[sol]->assignment(task)] += 1;
+    }
+    // adds to the model
+    for (map<int, int>::iterator it = machine_to_counts.begin();
+      it != machine_to_counts.end(); ++it) {
+      int machine = it->first;
+      int count = it->second;
+      SetVariable(cons_row, task, machine, count);
+    }
   }
 
   return 1;
@@ -325,12 +325,10 @@ void SolverFormulacaoPadrao::GenerateSolution(ProblemSolution* sol) {
 void SolverFormulacaoPadrao::Init(const SolverOptions& options) {
   /** creates the problem */
   lp_->createLP("FormulacaoPadrao", OPTSENSE_MINIMIZE, PROB_MIP);
-  for (int i = 5; i >= 0; --i) {
-    if (VLOG_IS_ON(i)) {
-      lp_->setMIPScreenLog(i);
-      break;
-    }
+  if (VLOG_IS_ON(6)) {
+    lp_->setMIPScreenLog(2);
   }
+
   lp_->setMIPRelTol(0.00);
 	lp_->setMIPAbsTol(0.00);
   
@@ -338,12 +336,12 @@ void SolverFormulacaoPadrao::Init(const SolverOptions& options) {
   lp_->setWorkMem(3000);
   lp_->setTreLim(20000);
   lp_->setNodeFileInd(2);
-  //if (problem_data_->num_tasks() >= 1600) {
+  if (problem_data_->num_tasks() >= 1600) {
     // Precisamos evitar esgotar a memória.
-    //lp_->setNodeSel(0);
+    lp_->setNodeSel(0);
     lp_->setVarSel(3);  // Strong branching.
     lp_->setMemoryEmphasis(true);
-  //}
+  }
 
   /** creates the variables */
   CreateVarTaskAssignment(*problem_data_, OPT_COL::VAR_BINARY, &vHash_, lp_);

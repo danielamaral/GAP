@@ -80,4 +80,24 @@ private:
     const ProblemData* pd_;
 };
 
+struct CompareSolutionPtrsByAssignment {
+  bool operator()(ProblemSolution* a, ProblemSolution* b) const {
+    for (int i = 0; i < a->n(); ++i) {
+      int x = a->assignment(i) - b->assignment(i);
+      if (x > 0)
+        return true;
+      else if (x < 0)
+        return false;
+    }
+    return false;
+  }
+};
+
+struct CompareSolutionPtrsByCost {
+  bool operator()(const ProblemSolution* a, const ProblemSolution* b) const {
+    return a->cost() > b->cost();
+  }
+};
+
+
 std::ostream& operator << (std::ostream& out, ProblemSolution& solution );

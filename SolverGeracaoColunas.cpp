@@ -1488,9 +1488,9 @@ void SolverGeracaoColunas::ReverseConstraint(int cons_row, int rhs) {
   }
 }
 
-int SolverGeracaoColunas::AddEllipsoidalConstraint(const ProblemSolution& x1,
-                                                   const ProblemSolution& x2,
-                                                   int k) {
-  ellipsoidal_cuts_.push_back(EllipsoidalCut(x1, x2, k));
+int SolverGeracaoColunas::AddEllipsoidalConstraint(const vector<ProblemSolution*>& x,
+                                                   OPT_ROW::ROWSENSE constraint_sense,
+                                                   int F) {
+  ellipsoidal_cuts_.push_back(EllipsoidalCut(x, constraint_sense, F));
   return ellipsoidal_cuts_.size() - 1;
 }

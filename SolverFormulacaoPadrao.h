@@ -54,7 +54,7 @@ public:
   void ReverseConstraint(int cons_row, int rhs);
     
 	int AddEllipsoidalConstraint(
-		const ProblemSolution& x1, const ProblemSolution& x2, int k);
+		  const vector<ProblemSolution*>& x, OPT_ROW::ROWSENSE constraint_sense, int F);
 	void ClearConsMaxAssignmentChangesEllipsoidal();
 
   // A partir de um problema dado, gera a formulação e retorna o valor das

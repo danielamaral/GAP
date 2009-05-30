@@ -112,12 +112,17 @@ int main(int argc, char* argv[]) {
 	} else if (algorithm == "VNSBra") {
     options.set_time_for_first_solution(60);
 		sw->Start();
-		LocalSearch::VNSBra(solver_factory, 60 * 60 * 1000, 120 * 1000, 5, &status);
+    LocalSearch::VNSBra(solver_factory, options.max_time() * 1000,
+                        120 * 1000, 5, &status);
 		sw->Stop();
 	} else if (algorithm == "Memetic") {
 		sw->Start();
 		LocalSearch::MIPMemetic(&status);
 		sw->Stop();
+  } else if (algorithm == "PathRelink") {
+    sw->Start();
+    LocalSearch::PathRelink(solver_factory, options.max_time(), &status);
+    sw->Stop();
   } else {
     LOG(FATAL) << "Inexistent algorithm specified: " << algorithm;
     return 3;

@@ -2,11 +2,15 @@
 
 #include "logging.h"
 
-/* static */ bool EllipsoidalCutUtil::IsValidFinalXijMatrix(const vector<EllipsoidalCut>& cuts,
-                                                    const vector<vector<double> >& x) {
+/* static */ bool EllipsoidalCutUtil::IsValidFinalXijMatrix(
+    const vector<EllipsoidalCut>& cuts, const vector<vector<double> >& x) {
   for (int i = 0; i < cuts.size(); ++i) {
-    int delta = EllipsoidalCutUtil::Delta(cuts[i], x);
-    if (delta < cuts[i].solution1().n() + cuts[i].alfa() - cuts[i].k()) {
+    int lhs = EllipsoidalCutUtil::Delta(cuts[i], x);
+    if (cuts[i].sense() == OPT_ROW::LESS && lhs > cuts[i].rhs()) {
+      return false;
+    } else if (cuts[i].sense() == OPT_ROW::EQUAL && lhs != cuts[i].rhs()) {
+      return false;
+    } else if (cuts[i].sense() == OPT_ROW::GREATER && lhs < cuts[i].rhs()) {
       return false;
     }
   }
@@ -27,16 +31,13 @@
     const EllipsoidalCut& cut,
     const vector<vector<double> >& final_x) {
   int lhs = 0;
-  for (int i = 0; i < cut.solution1().n(); ++i) {
-    double assignment = final_x[cut.solution1().assignment(i)][i];
-    CHECK(assignment < Globals::EPS() || assignment > 1.0 - Globals::EPS());
-    if (assignment > 1.0 - Globals::EPS()) {
-      ++lhs;
-    }
-    assignment = final_x[cut.solution2().assignment(i)][i];
-    CHECK(assignment < Globals::EPS() || assignment > 1.0 - Globals::EPS());
-    if (assignment > 1.0 - Globals::EPS()) {
-      ++lhs;
+  for (int machine = 0; machine < Globals::instance()->num_machines(); ++machine) {
+    for (int task = 0; task < Globals::instance()->num_tasks(); ++task) {
+      double assignment = final_x[machine][task];
+      CHECK(assignment < Globals::EPS() || assignment > 1.0 - Globals::EPS());
+      if (assignment > 1.0 - Globals::EPS()) {
+        lhs += cut.weight(machine, task);
+      }
     }
   }
   return lhs;

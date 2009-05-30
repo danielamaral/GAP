@@ -281,6 +281,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\SolutionSet.h"
+				>
+			</File>
+			<File
 				RelativePath=".\stdafx.h"
 				>
 			</File>
@@ -439,6 +443,10 @@
 			</File>
 			<File
 				RelativePath=".\ProblemSolution.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\SolutionSet.cpp"
 				>
 			</File>
 			<File

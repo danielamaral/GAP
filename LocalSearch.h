@@ -54,6 +54,7 @@ namespace LocalSearch {
       int k_step,
       int total_time_limit,
       int node_time_limit,
+      uint64* time_to_sol,
       ProblemSolution* x_cur);
 
   void VNSBra(
@@ -72,6 +73,12 @@ namespace LocalSearch {
 	void RandomizeSolution(ProblemSolution* sol, int exchanges);
 	void MIPMemetic(
 		SolverStatus* final_status);
+
+  // Path relink
+  void PathRelink(
+    SolverFactory* solver_factory,
+    int total_time_limit,
+    SolverStatus* status);
 };
 
 #endif

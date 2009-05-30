@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Globals.h"
+#include "opt_row.h"
 #include "ProblemSolution.h"
 
 #include <sstream>
@@ -71,17 +72,17 @@ public:
 
 class SolverStatus {
 public:
-	SolverStatus() : status(-1), final_sol(Globals::instance()),
-		gap_relative(0.0), gap_absolute(0.0), time(0.0), total_num_nodes(0),
-    node_with_best_result(-1) { }
+	SolverStatus() : status(-1), str_status("infeasible"), final_sol(Globals::instance()),
+		gap_relative(0.0), gap_absolute(0.0), time(0.0), time_to_best_solution(0.0),
+    total_num_nodes(0), node_with_best_result(-1) { }
 
 	string ToString() {
 		stringstream ss;
 		ss << final_sol.cost() << " ";
 		if (str_status != "heuristic")
 			ss << gap_relative << " " << gap_absolute << " ";
-		ss << time << " " << str_status << " " << total_num_nodes
-       << " " << node_with_best_result;
+		ss << time << " " << time_to_best_solution << " " << str_status
+       << " " << total_num_nodes << " " << node_with_best_result;
 		return ss.str();
 	}
 	int status;
@@ -92,6 +93,7 @@ public:
 	double gap_relative;
 	double gap_absolute;
 	double time;
+  double time_to_best_solution;
   int total_num_nodes;
   int node_with_best_result;
 };
@@ -157,8 +159,8 @@ class VnsSolver : public Solver {
   // Changes the sense of the constraint <cons_row> and updates the RHS side to <rhs>
   virtual void ReverseConstraint(int cons_row, int rhs) = 0;
 
-  // Adds an ellipsoidal constraint with solutions <x1> and <x2>
-  virtual int AddEllipsoidalConstraint(const ProblemSolution& x1,
-                                       const ProblemSolution& x2,
-                                       int k) = 0;
+  // Adds an ellipsoidal constraint with solutions in X with 
+  virtual int AddEllipsoidalConstraint(const vector<ProblemSolution*>& x,
+                                       OPT_ROW::ROWSENSE constraint_sense,
+                                       int F) = 0;
 };
