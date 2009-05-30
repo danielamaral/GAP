@@ -75,6 +75,8 @@ namespace LocalSearch {
 		SolverStatus* final_status);
 
   // Path relink
+  void RandomlyMutateSolution(const vector<pair<int, int> >& exchanges,
+                              int num_mutations, ProblemSolution* sol);
   void PathRelink(
     SolverFactory* solver_factory,
     int total_time_limit,

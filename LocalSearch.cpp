@@ -493,20 +493,44 @@ finalize:
 	final_status->time = elapsed_time / 1000.0;
 }
 
+void LocalSearch::RandomlyMutateSolution(
+    const vector<pair<int, int> >& exchanges, int num_mutations, ProblemSolution* sol) {
+  for (int mutations = 0; mutations < num_mutations; ++mutations) {
+    // Picks a random exchange
+    int e = Globals::rg()->IRandom(0, exchanges.size() - 1);
+    sol->Exchange(exchanges[e].first, exchanges[e].second);
+  }
+}
 
 void LocalSearch::PathRelink(SolverFactory* solver_factory,
                              int total_time_limit,
                              SolverStatus* status) {
   // Gerar um conjunto de soluções aleatórias em R
-  FixedSizeSolutionSet set(20);
-  for (int sol = 0; sol < 20; ++sol) {
+  const int kSetSize = 20;
+  FixedSizeSolutionSet R(kSetSize);
+  {
     VnsSolver* solver = solver_factory->NewVnsSolver(Globals::instance());
     SolverOptions options;
     options.set_only_first_solution(true);
     SolverStatus status;
     solver->Init(options);
     solver->Solve(options, &status);
-    set.AddSolution(status.final_sol);
+
+    // Creates a vector of possible task exchanges
+    const ProblemSolution& sol = status.final_sol;
+    vector<pair<int, int> > exchanges;
+    exchanges.reserve(sol.num_tasks() / 10 * sol.num_tasks());
+    for (int i = 0; i < sol.num_tasks(); ++i)
+      for (int j = i + 1; j < sol.num_tasks(); ++j)
+        if (sol.IsValidExchange(i, j))
+          exchanges.push_back(make_pair(i, j));
+
+    for (int sol = 0; sol < kSetSize; ++sol) {
+      ProblemSolution first_solution = status.final_sol;
+      RandomlyMutateSolution(exchanges, Globals::rg()->IRandom(5, 10),
+                             &first_solution);
+      R.AddSolution(first_solution);
+    }
   }
 
   // Fazer busca local em cada solução, substituir pelo ótimo local

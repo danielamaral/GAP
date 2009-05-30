@@ -331,6 +331,7 @@ void SolverFormulacaoPadrao::Init(const SolverOptions& options) {
 
   lp_->setMIPRelTol(0.00);
 	lp_->setMIPAbsTol(0.00);
+  lp_->setParallelMode(-1);
   
   // Maximum 2.8 gigs, store the rest on disk (uncompressed).
   lp_->setWorkMem(3000);
