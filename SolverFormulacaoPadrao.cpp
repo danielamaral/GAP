@@ -162,7 +162,7 @@ int SolverFormulacaoPadrao::AddEllipsoidalConstraint(
   // creates the constraint
   int cons_row = lp_->getNumRows();
   int nnz = problem_data_->n() * 2;
-  OPT_ROW row(nnz, OPT_ROW::GREATER, RHS, NULL);
+  OPT_ROW row(nnz, constraint_sense, RHS, NULL);
   lp_->addRow(row);
 
   // for each task

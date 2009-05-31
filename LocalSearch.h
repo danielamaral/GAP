@@ -42,10 +42,10 @@ namespace LocalSearch {
   bool EllipsoidalSearch(
       VnsSolver* solver,
       const vector<const ProblemSolution*>& sols,
-      int max_opt,
       uint64 total_time_ms,
       uint64 step_time_ms,
       int log,
+      bool only_first_solution,
       uint64* time_elapsed_ms,
       ProblemSolution* final_sol);
 
@@ -86,7 +86,6 @@ namespace LocalSearch {
     SolverFactory* solver_factory,
     uint64 total_time_ms,
     uint64 local_search_time_ms,
-    uint64 local_search_node_time_ms,
     int log_level,
     SolverStatus* status);
 };
