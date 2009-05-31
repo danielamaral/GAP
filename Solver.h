@@ -160,7 +160,7 @@ class VnsSolver : public Solver {
   virtual void ReverseConstraint(int cons_row, int rhs) = 0;
 
   // Adds an ellipsoidal constraint with solutions in X with 
-  virtual int AddEllipsoidalConstraint(const vector<ProblemSolution*>& x,
+  virtual int AddEllipsoidalConstraint(const vector<const ProblemSolution*>& x,
                                        OPT_ROW::ROWSENSE constraint_sense,
                                        int F) = 0;
 };

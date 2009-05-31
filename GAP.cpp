@@ -121,7 +121,8 @@ int main(int argc, char* argv[]) {
 		sw->Stop();
   } else if (algorithm == "PathRelink") {
     sw->Start();
-    LocalSearch::PathRelink(solver_factory, options.max_time(), &status);
+    LocalSearch::PathRelink(solver_factory, options.max_time() * 1000,
+                            20 * 1000, 10 * 1000, 1, &status);
     sw->Stop();
   } else {
     LOG(FATAL) << "Inexistent algorithm specified: " << algorithm;

@@ -22,7 +22,7 @@ class EllipsoidalCutUtil {
 
 class EllipsoidalCut {
  public:
-  EllipsoidalCut(const vector<ProblemSolution*>& x,
+  EllipsoidalCut(const vector<const ProblemSolution*>& x,
                  OPT_ROW::ROWSENSE constraint_sense, int F):
       k_(F), sense_(constraint_sense) {
     CalculateWeights(x);
@@ -48,7 +48,7 @@ class EllipsoidalCut {
   OPT_ROW::ROWSENSE sense_;
   map<int, map<int, int> > assignment_weights_;
 
-  void CalculateWeights(const vector<ProblemSolution*>& x) {
+  void CalculateWeights(const vector<const ProblemSolution*>& x) {
     assignment_weights_.clear();
     // for each task
     for (int task = 0; task < Globals::instance()->n(); ++task) {

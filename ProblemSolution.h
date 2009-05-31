@@ -95,7 +95,7 @@ struct CompareSolutionPtrsByAssignment {
 
 struct CompareSolutionPtrsByCost {
   bool operator()(const ProblemSolution* a, const ProblemSolution* b) const {
-    return a->cost() > b->cost();
+    return a->cost() < b->cost();
   }
 };
 

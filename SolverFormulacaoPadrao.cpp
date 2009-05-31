@@ -171,7 +171,7 @@ void SolverFormulacaoPadrao::ClearConsMaxAssignmentChangesEllipsoidal() {
 }
 
 int SolverFormulacaoPadrao::AddEllipsoidalConstraint(
-	const vector<ProblemSolution*>& x, OPT_ROW::ROWSENSE constraint_sense, int F) {
+	const vector<const ProblemSolution*>& x, OPT_ROW::ROWSENSE constraint_sense, int F) {
 	int RHS = problem_data_->n() * x.size() - F;
 
   // creates the constraint

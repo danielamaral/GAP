@@ -77,7 +77,7 @@ class SolverGeracaoColunas : public VnsSolver {
   virtual void ReverseConstraint(int cons_row, int rhs);
 
   virtual int AddEllipsoidalConstraint(
-      const vector<ProblemSolution*>& x, OPT_ROW::ROWSENSE constraint_sense, int F);
+      const vector<const ProblemSolution*>& x, OPT_ROW::ROWSENSE constraint_sense, int F);
 
 private:
   /********************************************************************

@@ -36,14 +36,16 @@ namespace LocalSearch {
       int ls_time,
       ProblemSolution* sol);
 
-  uint64 EllipsoidalSearch(
-	    const ProblemSolution& x1,
-	    const ProblemSolution& x2,
-	    int max_opt,
-	    int k_step,
-	    int step_time,
-	    int total_time,
-	    ProblemSolution* final_sol);
+  bool EllipsoidalSearch(
+      VnsSolver* solver,
+      const vector<const ProblemSolution*>& sols,
+      int max_opt,
+      int k_step,
+      uint64 total_time_ms,
+      uint64 step_time_ms,
+      int log,
+      uint64* time_elapsed_ms,
+      ProblemSolution* final_sol);
 
   void MultiEllipsoidalSearch();
 
@@ -52,15 +54,16 @@ namespace LocalSearch {
       VnsSolver *solver_intensification,
       int max_opt,
       int k_step,
-      int total_time_limit,
-      int node_time_limit,
+      uint64 total_time_ms,
+      uint64 node_time_ms,
+      int log_level,
       uint64* time_to_sol,
       ProblemSolution* x_cur);
 
   void VNSBra(
       SolverFactory* solver_factory,
-      int total_time_limit,
-      int node_time_limit,
+      uint64 total_time_ms,
+      uint64 node_time_ms,
       int k_step,
       SolverStatus* status);
 
@@ -75,11 +78,15 @@ namespace LocalSearch {
 		SolverStatus* final_status);
 
   // Path relink
-  void RandomlyMutateSolution(const vector<pair<int, int> >& exchanges,
-                              int num_mutations, ProblemSolution* sol);
+  void RandomlyMutateSolutionWithPrecalc(const vector<pair<int, int> >& exchanges, 
+                                         int num_mutations, ProblemSolution* sol);
+  void RandomlyMutateSolution(int num_mutations, ProblemSolution* sol);
   void PathRelink(
     SolverFactory* solver_factory,
-    int total_time_limit,
+    uint64 total_time_ms,
+    uint64 local_search_time_ms,
+    uint64 local_search_node_time_ms,
+    int log_level,
     SolverStatus* status);
 };
 

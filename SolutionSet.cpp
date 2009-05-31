@@ -52,6 +52,11 @@ const ProblemSolution& FixedSizeSolutionSet::GetSolution(int i) const {
   return *mem_buffer_[i];
 }
 
-int FixedSizeSolutionSet::GetSize() const {
+const ProblemSolution* FixedSizeSolutionSet::GetSolutionPtr(int i) const {
+  CHECK_LT(i, sol_map_.size());
+  return mem_buffer_[i];
+}
+
+int FixedSizeSolutionSet::size() const {
   return sol_map_.size();
 }
