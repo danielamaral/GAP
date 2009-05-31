@@ -630,9 +630,9 @@ void LocalSearch::PathRelink(SolverFactory* solver_factory,
                              uint64 local_search_time_ms,
                              uint64 local_search_node_time_ms,
                              int log,
-                             SolverStatus* status) {
+                             SolverStatus* final_status) {
   // Gerar um conjunto de soluções aleatórias em R
-  const int kSetSize = 4;
+  const int kSetSize = 2;
   FixedSizeSolutionSet R(kSetSize);
   {
     VnsSolver* solver = solver_factory->NewVnsSolver(Globals::instance());
@@ -641,6 +641,8 @@ void LocalSearch::PathRelink(SolverFactory* solver_factory,
     SolverStatus status;
     solver->Init(options);
     solver->Solve(options, &status);
+    CHECK(status.status == OPTSTAT_FEASIBLE || status.status == OPTSTAT_MIPOPTIMAL);
+    final_status->final_sol = status.final_sol;
 
     // Creates a vector of possible task exchanges
     const ProblemSolution& sol = status.final_sol;
@@ -675,6 +677,8 @@ void LocalSearch::PathRelink(SolverFactory* solver_factory,
                                       local_search_node_time_ms,
                                       log + 1, &time_to_best, &s);
       if (R.AddSolution(s)) {
+        if (s.cost() < final_status->final_sol.cost())
+          final_status->final_sol = s;
         VLOG(log) << "PathRelink: updated solution " << i << " with new local minima: "
                   << s.cost();
       }
@@ -689,7 +693,7 @@ void LocalSearch::PathRelink(SolverFactory* solver_factory,
     vector<ProblemSolution*> S;
 
     // Achar as X melhores soluções no caminho de A para B, adicionar a S
-    const int X = 8;
+    const int X = 1;
     while (S.size() < X) {
       VLOG(log) << "PathRelink: relink step, " << X - S.size() << " still remaining.";
       // Escolher aleatóriamente duas soluções de R
@@ -730,10 +734,9 @@ void LocalSearch::PathRelink(SolverFactory* solver_factory,
     }
 
     // Enquanto existirem soluções a ser otimizadas em S:
+    VnsSolver* solver_inten = solver_factory->NewVnsSolver(Globals::instance());
+    solver_inten->Init(SolverOptions());
     while (S.size() > 0) {
-      VnsSolver* solver_inten = solver_factory->NewVnsSolver(Globals::instance());
-      solver_inten->Init(SolverOptions());
-
       // Escolher uma solução aleatória, otimizar, remover de S
       int picked_sol = Globals::rg()->IRandom(0, S.size() - 1);
       ProblemSolution* s = S[picked_sol];
@@ -743,10 +746,11 @@ void LocalSearch::PathRelink(SolverFactory* solver_factory,
       LocalSearch::VNSIntensification(solver_inten, 6, local_search_time_ms,
                                       local_search_node_time_ms,
                                       log + 1, &time_to_best, s);
-      delete solver_inten;
 
       // Tentar adicionar o ótimo local a R
       if (R.AddSolution(*s)) {
+        if (s->cost() < final_status->final_sol.cost())
+          final_status->final_sol = *s;
         VLOG(log) << "PathRelink: added local optima to R, new cost: " << s->cost();
       } else {
         VLOG(log) << "PathRelink: DIDN'T add local optima to R, new cost: " << s->cost();
@@ -757,5 +761,7 @@ void LocalSearch::PathRelink(SolverFactory* solver_factory,
       delete S[S.size() - 1];
       S.pop_back();
     }
+    delete solver_inten;
+    VLOG(log) << "PathRelink: best solution so far: " << final_status->final_sol.cost();
   }
 }
