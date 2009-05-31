@@ -21,7 +21,7 @@ bool FixedSizeSolutionSet::AddSolution(const ProblemSolution& s) {
 
   // Set is full, add if not present and better than worst cost.
   SolutionMap::iterator it = sol_map_.find(const_cast<ProblemSolution*>(&s));
-  if (it == sol_map_.end() && heap_.top()->cost() > s.cost()) {
+  if (it == sol_map_.end() && heap_.top()->cost() >= s.cost()) {
     int index = RemoveWorstSolution();
     // Adds the new solution.
     AddSolution(s, index);

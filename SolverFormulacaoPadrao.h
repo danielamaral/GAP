@@ -55,7 +55,6 @@ public:
     
 	int AddEllipsoidalConstraint(
 		  const vector<const ProblemSolution*>& x, OPT_ROW::ROWSENSE constraint_sense, int F);
-	void ClearConsMaxAssignmentChangesEllipsoidal();
 
   // A partir de um problema dado, gera a formulação e retorna o valor das
   // variáveis duais no problema relaxado (a.k.a. a relaxação linear do

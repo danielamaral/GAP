@@ -163,4 +163,14 @@ class VnsSolver : public Solver {
   virtual int AddEllipsoidalConstraint(const vector<const ProblemSolution*>& x,
                                        OPT_ROW::ROWSENSE constraint_sense,
                                        int F) = 0;
+
+  virtual int AddEllipsoidalMaxChangesConstraint(
+      const vector<const ProblemSolution*>& x, int RHS) {
+    return AddEllipsoidalConstraint(x, OPT_ROW::GREATER, RHS);
+  }
+
+  virtual int AddEllipsoidalMinChangesConstraint(
+      const vector<const ProblemSolution*>& x, int RHS) {
+    return AddEllipsoidalConstraint(x, OPT_ROW::LESS, RHS);
+  }
 };

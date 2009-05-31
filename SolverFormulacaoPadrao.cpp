@@ -157,41 +157,13 @@ void SolverFormulacaoPadrao::SetVariable(int cons_row, int task, int machine, do
 	lp_->chgCoef(cons_row, vit->second, coef);
 }
 
-void SolverFormulacaoPadrao::ClearConsMaxAssignmentChangesEllipsoidal() {
-  ConstraintFormulacaoPadrao cons;
-  cons.set_type(ConstraintFormulacaoPadrao::C_MAX_ASSIGNMENT_CHANGES_ELLIPSOIDAL);
-  ConstraintFormulacaoPadraoHash::iterator cit = cHash_.find(cons);
-	if (cit != cHash_.end()) {
-		int cons_row = cit->second;
-        for (int i = 0; i < lp_->getNumCols(); ++i) {
-            lp_->chgCoef(cons_row, i, 0.0);
-        }
-        lp_->chgRHS(cons_row, 0.0);
-	}
-}
-
 int SolverFormulacaoPadrao::AddEllipsoidalConstraint(
-	const vector<const ProblemSolution*>& x, OPT_ROW::ROWSENSE constraint_sense, int F) {
-	int RHS = problem_data_->n() * x.size() - F;
-
+	const vector<const ProblemSolution*>& x, OPT_ROW::ROWSENSE constraint_sense, int RHS) {
   // creates the constraint
-  ConstraintFormulacaoPadrao cons;
-  cons.set_type(ConstraintFormulacaoPadrao::C_MAX_ASSIGNMENT_CHANGES_ELLIPSOIDAL);
-  ConstraintFormulacaoPadraoHash::iterator cit = cHash_.find(cons);
-  int cons_row;
-  if (cit != cHash_.end()) {
-    // the constraint already exists, zero it
-    cons_row = cit->second;
-	  ClearConsMaxAssignmentChangesEllipsoidal();
-    lp_->chgSense(cons_row, constraint_sense);
-    lp_->chgRHS(cons_row, RHS);
-  } else {
-    cons_row = lp_->getNumRows();
-    cHash_[cons] = lp_->getNumRows();
-    int nnz = problem_data_->n() * 2;
-    OPT_ROW row(nnz, constraint_sense, RHS, (char*) cons.ToString().c_str());
-    lp_->addRow(row);
-  }
+  int cons_row = lp_->getNumRows();
+  int nnz = problem_data_->n() * 2;
+  OPT_ROW row(nnz, OPT_ROW::GREATER, RHS, NULL);
+  lp_->addRow(row);
 
   // for each task
   for (int task = 0; task < problem_data_->n(); ++task) {
@@ -209,7 +181,7 @@ int SolverFormulacaoPadrao::AddEllipsoidalConstraint(
     }
   }
 
-  return 1;
+  return cons_row;
 }
 
 void SolverFormulacaoPadrao::RemoveConstraint(int cons_row) {
@@ -227,13 +199,10 @@ void SolverFormulacaoPadrao::ReverseConstraint(int cons_row, int rhs) {
         lp_->chgSense(cons_row, OPT_ROW::LESS);
     else
         lp_->chgSense(cons_row, OPT_ROW::GREATER);
-    lp_->chgRHS(cons_row, problem_data_->n() - rhs);
+    lp_->chgRHS(cons_row, rhs);
 }
 
-int SolverFormulacaoPadrao::AddConsMaxAssignmentChanges(const ProblemSolution& sol, int num_changes) {
-	// the right hand side
-	int rhs = problem_data_->n() - num_changes;
-
+int SolverFormulacaoPadrao::AddConsMaxAssignmentChanges(const ProblemSolution& sol, int rhs) {
   int cons_row = lp_->getNumRows();
   int nnz = problem_data_->n();
   OPT_ROW row(nnz, OPT_ROW::GREATER, rhs, (char*) "ConsMaxAssignmentChanges");
@@ -247,10 +216,7 @@ int SolverFormulacaoPadrao::AddConsMaxAssignmentChanges(const ProblemSolution& s
   return cons_row;
 }
 
-int SolverFormulacaoPadrao::AddConsMinAssignmentChanges(const ProblemSolution& sol, int num_changes) {
-	// the right hand side
-	int rhs = problem_data_->n() - num_changes;
-
+int SolverFormulacaoPadrao::AddConsMinAssignmentChanges(const ProblemSolution& sol, int rhs) {
   int cons_row = lp_->getNumRows();
   int nnz = problem_data_->n();
   OPT_ROW row(nnz, OPT_ROW::LESS, rhs, (char*) "ConsMinAssignmentChanges");

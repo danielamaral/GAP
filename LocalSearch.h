@@ -36,11 +36,13 @@ namespace LocalSearch {
       int ls_time,
       ProblemSolution* sol);
 
+  void GetEllipsoidalBounds(const vector<const ProblemSolution*>& sols,
+                            int* minimum_f, int* maximum_f);
+
   bool EllipsoidalSearch(
       VnsSolver* solver,
       const vector<const ProblemSolution*>& sols,
       int max_opt,
-      int k_step,
       uint64 total_time_ms,
       uint64 step_time_ms,
       int log,
@@ -53,7 +55,6 @@ namespace LocalSearch {
 	uint64 VNSIntensification(
       VnsSolver *solver_intensification,
       int max_opt,
-      int k_step,
       uint64 total_time_ms,
       uint64 node_time_ms,
       int log_level,
