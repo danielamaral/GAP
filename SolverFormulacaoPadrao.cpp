@@ -205,7 +205,7 @@ void SolverFormulacaoPadrao::ReverseConstraint(int cons_row, int rhs) {
 int SolverFormulacaoPadrao::AddConsMaxAssignmentChanges(const ProblemSolution& sol, int rhs) {
   int cons_row = lp_->getNumRows();
   int nnz = problem_data_->n();
-  OPT_ROW row(nnz, OPT_ROW::GREATER, rhs, (char*) "ConsMaxAssignmentChanges");
+  OPT_ROW row(nnz, OPT_ROW::GREATER, rhs, NULL);
   lp_->addRow(row);
 
   // for each task
@@ -219,7 +219,7 @@ int SolverFormulacaoPadrao::AddConsMaxAssignmentChanges(const ProblemSolution& s
 int SolverFormulacaoPadrao::AddConsMinAssignmentChanges(const ProblemSolution& sol, int rhs) {
   int cons_row = lp_->getNumRows();
   int nnz = problem_data_->n();
-  OPT_ROW row(nnz, OPT_ROW::LESS, rhs, (char*) "ConsMinAssignmentChanges");
+  OPT_ROW row(nnz, OPT_ROW::LESS, rhs, NULL);
   lp_->addRow(row);
 
   // for each task
@@ -297,7 +297,7 @@ void SolverFormulacaoPadrao::Init(const SolverOptions& options) {
 
   lp_->setMIPRelTol(0.00);
 	lp_->setMIPAbsTol(0.00);
-  //lp_->setParallelMode(-1);
+  lp_->setParallelMode(-1);
   
   // Maximum 2.8 gigs, store the rest on disk (uncompressed).
   lp_->setWorkMem(3000);
@@ -410,7 +410,7 @@ int SolverFormulacaoPadrao::Solve(const SolverOptions& options,
 
 int SolverFormulacaoPadrao::SolveTLAndUB(int time_limit, double upper_bound, bool first) {
 	/** sets lp parameters */
-  lp_->writeProbLP("SolverFormulacaoPadrao");
+  //lp_->writeProbLP("SolverFormulacaoPadrao");
 	//lp_->setVarSel(3);
   //cout << "Time: " << time_limit;
   if (time_limit > 0)

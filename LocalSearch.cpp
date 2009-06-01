@@ -378,11 +378,12 @@ uint64 LocalSearch::VNSIntensification(VnsSolver *solver_intensification,
     int TL = min(node_time_ms, total_time_ms - static_cast<int>(elapsed_time));
     VLOG(log + 1)
         << "VNSInt: Adding local branching constraint delta(x, x_cur) "
-        << "<= rhs = " << rhs << ", UB = f_cur = " << x_cur->cost()
-        << ", time: " << TL / 1000.0;
+        << "<= rhs = " << rhs << " (>= " << RHS(rhs) << "), UB = f_cur = "
+        << x_cur->cost() << ", time: " << TL / 1000.0 << ", num constr: "
+        << added_cons.size();
     added_cons.push_back(
         solver_intensification->AddConsMaxAssignmentChanges(*x_cur, RHS(rhs)));
-    double UB = x_cur->cost(); // - 1;
+    double UB = x_cur->cost();
 
     // runs CPLEX
     sw->Start();
@@ -397,11 +398,12 @@ uint64 LocalSearch::VNSIntensification(VnsSolver *solver_intensification,
     elapsed_time += sw->ElapsedMilliseconds;
     sw->Reset();
 
-    if (status.final_sol == *x_cur)
-      status.status = OPTSTAT_INFEASIBLE;
-
+    // TODO(danielrocha): this shouldn't be necessary, but CPLEX is not working
+    // as I expected it to - I think it has something to do with the re-use of
+    // previous solutions.
     if (status.status == OPTSTAT_MIPOPTIMAL || status.status == OPTSTAT_FEASIBLE)
-      CHECK_GT(x_cur->cost(), status.final_sol.cost());
+      if (status.final_sol == *x_cur || status.final_sol.cost() >= x_cur->cost())
+        status.status = OPTSTAT_MIPOPTIMAL; // Make sure we don't visit this solution.
 
     switch(status.status) {
       case OPTSTAT_MIPOPTIMAL:
@@ -636,7 +638,7 @@ void LocalSearch::PathRelink(SolverFactory* solver_factory,
                              int log,
                              SolverStatus* final_status) {
   // Gerar um conjunto de soluções aleatórias em R
-  const int kSetSize = 2;
+  const int kSetSize = 8;
   FixedSizeSolutionSet R(kSetSize);
   {
     VnsSolver* solver = solver_factory->NewVnsSolver(Globals::instance());
@@ -658,6 +660,8 @@ void LocalSearch::PathRelink(SolverFactory* solver_factory,
         if (sol.IsValidExchange(i, j))
           exchanges.push_back(make_pair(i, j));
 
+    VLOG(log) << "PathRelink: adding initial solution (from CPLEX), cost: "
+              << status.final_sol.cost();
     R.AddSolution(status.final_sol);
     for (int sol = 0; sol < kSetSize - 1; ++sol) {
       ProblemSolution first_solution = status.final_sol;
@@ -673,12 +677,13 @@ void LocalSearch::PathRelink(SolverFactory* solver_factory,
 
   // Fazer busca local em cada solução, substituir pelo ótimo local
   {
-    VnsSolver* solver = solver_factory->NewVnsSolver(Globals::instance());
-    solver->Init(SolverOptions());
     for (int i = 0; i < kSetSize; ++i) {
+      VnsSolver* solver = solver_factory->NewVnsSolver(Globals::instance());
+      solver->Init(SolverOptions());
       ProblemSolution s = R.GetSolution(i);
       uint64 time_to_best = 0;
-      VLOG(log) << "PathRelink: updating solution " << i << " with its local optima.";
+      VLOG(log) << "PathRelink: updating solution " << i << " (cost: " << s.cost()
+                << "), with its local optima.";
       LocalSearch::VNSIntensification(solver, Globals::instance()->n(), total_time_ms,
                                       local_search_time_ms,
                                       log + 1, &time_to_best, &s);
@@ -688,9 +693,8 @@ void LocalSearch::PathRelink(SolverFactory* solver_factory,
         VLOG(log) << "PathRelink: updated solution " << i << " with new local minima: "
                   << s.cost();
       }
+      delete solver;
     }
-
-    delete solver;
   }
 
   // Enquanto criterio de parada nao for atingido
@@ -699,7 +703,7 @@ void LocalSearch::PathRelink(SolverFactory* solver_factory,
     vector<ProblemSolution*> S;
 
     // Achar as X melhores soluções no caminho de A para B, adicionar a S
-    const int X = 1;
+    const int X = 6;
     while (S.size() < X) {
       VLOG(log) << "PathRelink: relink step, " << X - S.size() << " still remaining.";
       // Escolher aleatóriamente duas soluções de R
