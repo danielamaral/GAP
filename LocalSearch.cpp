@@ -131,7 +131,7 @@ bool LocalSearch::EllipsoidalSearch(VnsSolver* solver,
 
   bool feasible = false;
   bool cont = true;
-  int rhs = min_opt;
+  int rhs = min_opt + 2;
   int k_step = 8;
   deque<int> added_cons;
   while (cont && *time_elapsed_ms < total_time_ms && rhs + k_step <= max_opt) {
@@ -260,7 +260,7 @@ void LocalSearch::VNSBra(SolverFactory* solver_factory,
   solver_intensification->Solve(options, status);
   if (status->status == OPTSTAT_MIPOPTIMAL)
     return;
-  solver_intensification->GenerateSolution(&x_opt);  // creates initial solution
+  x_opt = status->final_sol;  // creates initial solution
 
   ProblemSolution x_cur(x_opt);
   double f_cur = x_opt.cost();
@@ -378,63 +378,66 @@ uint64 LocalSearch::VNSIntensification(VnsSolver *solver_intensification,
     int TL = min(node_time_ms, total_time_ms - static_cast<int>(elapsed_time));
     VLOG(log + 1)
         << "VNSInt: Adding local branching constraint delta(x, x_cur) "
-        << "<= rhs = " << rhs << ", UB = f_cur = " << x_cur->cost();
+        << "<= rhs = " << rhs << ", UB = f_cur = " << x_cur->cost()
+        << ", time: " << TL / 1000.0;
     added_cons.push_back(
         solver_intensification->AddConsMaxAssignmentChanges(*x_cur, RHS(rhs)));
-    double UB = x_cur->cost();
+    double UB = x_cur->cost(); // - 1;
 
     // runs CPLEX
     sw->Start();
     // status = MIPSOLVE(TL, UB, first = false, x_next, f_next)
     SolverOptions options; options.set_max_time(TL / 1000); options.set_cut_off_value(UB);
-    VLOG(log)
-        << "VNSInt: Calling solver_intensification with time: "
-        << options.max_time() << ", cutoff: " << options.cut_off_value();
     SolverStatus status;
     solver_intensification->Solve(options, &status);
     VLOG(log)
         << "VNSInt: status = MIPSOLVE(TL=" << options.max_time() << ", UB="
-        << options.cut_off_value() << ", first=false, x_next, f_next) = "
-        << status.status;
+        << UB << ", first=false, x_next, f_next) = " << status.status;
     sw->Stop();
     elapsed_time += sw->ElapsedMilliseconds;
     sw->Reset();
 
-    VLOG(log) << "VND search - RHS = " << rhs << ", TL = " << TL / 1000 << "s, UB = "
-              << UB << ", status = " << status.status;
+    if (status.final_sol == *x_cur)
+      status.status = OPTSTAT_INFEASIBLE;
+
+    if (status.status == OPTSTAT_MIPOPTIMAL || status.status == OPTSTAT_FEASIBLE)
+      CHECK_GT(x_cur->cost(), status.final_sol.cost());
+
     switch(status.status) {
       case OPTSTAT_MIPOPTIMAL:
-        VLOG(log) << "VND search - optimal, reverting constraint to delta(x, x_cur) >= "
-                  << rhs + 1;
-        // x_cur = x_next, f_cur = f_next;
-        if (status.final_sol.cost() < x_cur->cost())
-          *time_to_sol = elapsed_time;
-        *x_cur = status.final_sol;
+        VLOG(log) << "VNSInt: optimal, reverting constraint to delta(x, x_cur) >= "
+                  << rhs + 1 << " = " << RHS(rhs + 1);
         // reverse last local branching constraint into delta(x, x_cur) >= rhs + 1
         solver_intensification->ReverseConstraint(added_cons.back(), RHS(rhs + 1));
+        // x_cur = x_next, f_cur = f_next;
+        if (status.final_sol.cost() < x_cur->cost()) {
+          *time_to_sol = elapsed_time;
+          *x_cur = status.final_sol;
+        }
         rhs = 1;
         break;
       case OPTSTAT_FEASIBLE:
-        VLOG(log) << "VND search - feasible, reverting constraint to delta(x, x_cur) >= "
-                  << 1;
-        //x_cur = x_next, f_cur = f_next;
-        if (status.final_sol.cost() < x_cur->cost())
-          *time_to_sol = elapsed_time;
-        *x_cur = status.final_sol;
+        VLOG(log) << "VNSInt: feasible, reverting constraint to delta(x, x_cur) >= "
+                  << 1 << " = " << RHS(1);
         // reverse last local branching constraint into delta(x, x_cur) >= 1
         solver_intensification->ReverseConstraint(added_cons.back(), RHS(1));
+        //x_cur = x_next, f_cur = f_next;
+        if (status.final_sol.cost() < x_cur->cost()) {
+          *time_to_sol = elapsed_time;
+          *x_cur = status.final_sol;
+        }
         rhs = 1;
         break;
       case OPTSTAT_INFEASIBLE:
-        VLOG(log) << "VND search - proven infeasible, removing last constraint, "
-                  << "new RHS = " << rhs + 1;
+        VLOG(log) << "VNSInt: proven infeasible, removing last constraint, "
+                  << "new RHS = " << rhs + 1 << " = " << RHS(rhs + 1);
         // remove last local branching constraint;
         solver_intensification->RemoveConstraint(added_cons.back());
         added_cons.pop_back();
         rhs += 1;
         break;
       case OPTSTAT_NOINTEGER:
-        VLOG(log) << "VND search - infeasible, breaking out of the search";
+        VLOG(log) << "VNSInt: infeasible, breaking out of the search";
         cont = false;
         break;
     }
@@ -676,7 +679,7 @@ void LocalSearch::PathRelink(SolverFactory* solver_factory,
       ProblemSolution s = R.GetSolution(i);
       uint64 time_to_best = 0;
       VLOG(log) << "PathRelink: updating solution " << i << " with its local optima.";
-      LocalSearch::VNSIntensification(solver, 6, total_time_ms,
+      LocalSearch::VNSIntensification(solver, Globals::instance()->n(), total_time_ms,
                                       local_search_time_ms,
                                       log + 1, &time_to_best, &s);
       if (R.AddSolution(s)) {

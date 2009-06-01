@@ -265,8 +265,8 @@ void SolverFormulacaoPadrao::GenerateSolution(ProblemSolution* sol) {
 
   // Loads the solution into the Variable hash and constructs the
   // ProblemSolution
-  double* x = new double[lp->getNumCols()];
-  lp->getX(x);
+  vector<double> x(lp->getNumCols());
+  lp->getX(&x[0]);
 
   //cout << "loading solution!!!" << endl;
   int cont = 0;
@@ -285,7 +285,7 @@ void SolverFormulacaoPadrao::GenerateSolution(ProblemSolution* sol) {
     }
   }
   //cout << "cont = " << cont << endl;
-  assert(sol->IsValid());
+  CHECK(sol->IsValid());
 }
 
 void SolverFormulacaoPadrao::Init(const SolverOptions& options) {
@@ -297,7 +297,7 @@ void SolverFormulacaoPadrao::Init(const SolverOptions& options) {
 
   lp_->setMIPRelTol(0.00);
 	lp_->setMIPAbsTol(0.00);
-  lp_->setParallelMode(-1);
+  //lp_->setParallelMode(-1);
   
   // Maximum 2.8 gigs, store the rest on disk (uncompressed).
   lp_->setWorkMem(3000);
