@@ -23,6 +23,7 @@ public:
     use_stabilization_ = true;
     max_time_ = -1;  // No time limit.
     time_for_first_solution_ = 180;  // A standard initial value.
+    solver_log_ = false;
   }
 
   SolverOptions() {
@@ -35,8 +36,10 @@ public:
   int time_for_first_solution() const { return time_for_first_solution_; }
   bool only_first_solution() const { return only_first_solution_; }
   bool use_stabilization() const { return use_stabilization_; }
+  bool solver_log() const { return solver_log_; }
 
   // Setters
+  void set_solver_log(bool v) { solver_log_ = v; }
   void set_cut_off_value(double v) { cut_off_value_ = v; }
   void set_max_time(int t) { max_time_ = t; }
   void set_only_first_solution(bool v) { only_first_solution_ = v; }
@@ -68,6 +71,7 @@ public:
   int max_time_;
   int time_for_first_solution_;
   bool use_stabilization_;
+  bool solver_log_;
 };
 
 class SolverStatus {

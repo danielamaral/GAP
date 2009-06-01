@@ -66,7 +66,7 @@ public:
       const ProblemData& p, int time_limit, ProblemSolution* sol);
 
 private:
-	int SolveTLAndUB(int time_limit, double upper_bound, bool first = false);
+	int SolveTLAndUB(int time_limit, double upper_bound, bool log, bool first = false);
 
   /********************************************************************
   **                     VARIABLE CREATION                           **

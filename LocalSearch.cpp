@@ -150,6 +150,7 @@ bool LocalSearch::EllipsoidalSearch(VnsSolver* solver,
     // Runs the solver
     sw->Start();
     SolverOptions options; options.set_max_time(TL / 1000.0); options.set_cut_off_value(UB);
+    //options.set_solver_log(true);
     SolverStatus status;
 		solver->Solve(options, &status);
 		sw->Stop();
@@ -403,12 +404,12 @@ uint64 LocalSearch::VNSIntensification(VnsSolver *solver_intensification,
     // previous solutions.
     if (status.status == OPTSTAT_MIPOPTIMAL || status.status == OPTSTAT_FEASIBLE)
       if (status.final_sol == *x_cur || status.final_sol.cost() >= x_cur->cost())
-        status.status = OPTSTAT_MIPOPTIMAL; // Make sure we don't visit this solution.
+        status.status = OPTSTAT_INFEASIBLE;
 
     switch(status.status) {
       case OPTSTAT_MIPOPTIMAL:
         VLOG(log) << "VNSInt: optimal, reverting constraint to delta(x, x_cur) >= "
-                  << rhs + 1 << " = " << RHS(rhs + 1);
+                  << rhs + 1 << " (<= " << RHS(rhs + 1) << ")";
         // reverse last local branching constraint into delta(x, x_cur) >= rhs + 1
         solver_intensification->ReverseConstraint(added_cons.back(), RHS(rhs + 1));
         // x_cur = x_next, f_cur = f_next;
@@ -420,7 +421,7 @@ uint64 LocalSearch::VNSIntensification(VnsSolver *solver_intensification,
         break;
       case OPTSTAT_FEASIBLE:
         VLOG(log) << "VNSInt: feasible, reverting constraint to delta(x, x_cur) >= "
-                  << 1 << " = " << RHS(1);
+                  << 1 << " (<= " << RHS(1) << ")";
         // reverse last local branching constraint into delta(x, x_cur) >= 1
         solver_intensification->ReverseConstraint(added_cons.back(), RHS(1));
         //x_cur = x_next, f_cur = f_next;
@@ -432,7 +433,7 @@ uint64 LocalSearch::VNSIntensification(VnsSolver *solver_intensification,
         break;
       case OPTSTAT_INFEASIBLE:
         VLOG(log) << "VNSInt: proven infeasible, removing last constraint, "
-                  << "new RHS = " << rhs + 1 << " = " << RHS(rhs + 1);
+                  << "new RHS = " << rhs + 1 << " (>= " << RHS(rhs + 1) << ")";
         // remove last local branching constraint;
         solver_intensification->RemoveConstraint(added_cons.back());
         added_cons.pop_back();
@@ -676,7 +677,7 @@ void LocalSearch::PathRelink(SolverFactory* solver_factory,
   }
 
   // Fazer busca local em cada solução, substituir pelo ótimo local
-  {
+  if (false) {
     for (int i = 0; i < kSetSize; ++i) {
       VnsSolver* solver = solver_factory->NewVnsSolver(Globals::instance());
       solver->Init(SolverOptions());
@@ -726,7 +727,7 @@ void LocalSearch::PathRelink(SolverFactory* solver_factory,
       ProblemSolution* new_solution = new ProblemSolution(Globals::instance());
       VnsSolver* solver_diver = solver_factory->NewVnsSolver(Globals::instance());
       solver_diver->Init(SolverOptions());
-      bool feasible = 
+      bool feasible =
           LocalSearch::EllipsoidalSearch(
               solver_diver, sol_in_ellipse, total_time_ms, local_search_time_ms,
               log, true, &time_elapsed_ms, new_solution);
@@ -743,9 +744,10 @@ void LocalSearch::PathRelink(SolverFactory* solver_factory,
     }
 
     // Enquanto existirem soluções a ser otimizadas em S:
-    VnsSolver* solver_inten = solver_factory->NewVnsSolver(Globals::instance());
-    solver_inten->Init(SolverOptions());
     while (S.size() > 0) {
+      VnsSolver* solver_inten = solver_factory->NewVnsSolver(Globals::instance());
+      solver_inten->Init(SolverOptions());
+
       // Escolher uma solução aleatória, otimizar, remover de S
       int picked_sol = Globals::rg()->IRandom(0, S.size() - 1);
       ProblemSolution* s = S[picked_sol];
@@ -769,8 +771,9 @@ void LocalSearch::PathRelink(SolverFactory* solver_factory,
       swap(S[picked_sol], S[S.size() - 1]);
       delete S[S.size() - 1];
       S.pop_back();
+
+      delete solver_inten;
     }
-    delete solver_inten;
     VLOG(log) << "PathRelink: best solution so far: " << final_status->final_sol.cost();
   }
 }

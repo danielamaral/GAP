@@ -291,13 +291,12 @@ void SolverFormulacaoPadrao::GenerateSolution(ProblemSolution* sol) {
 void SolverFormulacaoPadrao::Init(const SolverOptions& options) {
   /** creates the problem */
   lp_->createLP("FormulacaoPadrao", OPTSENSE_MINIMIZE, PROB_MIP);
-  if (VLOG_IS_ON(6)) {
-    lp_->setMIPScreenLog(2);
-  }
 
   lp_->setMIPRelTol(0.00);
 	lp_->setMIPAbsTol(0.00);
   lp_->setParallelMode(-1);
+  lp_->setRepeatPresolve(0);
+  lp_->setRepairFrequency(-1);
   
   // Maximum 2.8 gigs, store the rest on disk (uncompressed).
   lp_->setWorkMem(3000);
@@ -396,8 +395,8 @@ void SolverFormulacaoPadrao::Init(const SolverOptions& options) {
 
 int SolverFormulacaoPadrao::Solve(const SolverOptions& options,
                                   SolverStatus* output_status) {
-  int status = SolveTLAndUB(options.max_time(),
-                            options.cut_off_value(), options.only_first_solution());
+  int status = SolveTLAndUB(options.max_time(), options.cut_off_value(),
+                            options.solver_log(), options.only_first_solution());
   if (output_status != NULL) {
     output_status->status = status;
     output_status->gap_absolute = GetGapAbsolute();
@@ -408,21 +407,30 @@ int SolverFormulacaoPadrao::Solve(const SolverOptions& options,
   return status;
 }
 
-int SolverFormulacaoPadrao::SolveTLAndUB(int time_limit, double upper_bound, bool first) {
+int SolverFormulacaoPadrao::SolveTLAndUB(int time_limit, double upper_bound, bool log, bool first) {
 	/** sets lp parameters */
   //lp_->writeProbLP("SolverFormulacaoPadrao");
 	//lp_->setVarSel(3);
   //cout << "Time: " << time_limit;
+  if (log)
+    lp_->setMIPScreenLog(2);
+  else
+    lp_->setMIPScreenLog(0);
+  
   if (time_limit > 0)
-	  lp_->setTimeLimit(time_limit);
+    lp_->setTimeLimit(time_limit);
+  else
+    lp_->setTimeLimit(0);
 
 	if (upper_bound < Globals::Infinity())
-		lp_->setMIPCutOff(upper_bound);
+    lp_->setMIPCutOff(upper_bound);
+  else
+    lp_->setMIPCutOff(1e75);
 
-    if (first)
-        lp_->setNumIntSols(1);
-    else
-        lp_->setNumIntSols(0);  // maximum number
+  if (first)
+    lp_->setNumIntSols(1);
+  else
+    lp_->setNumIntSols(0);
 
   /** solves the problem */
 	return lp_->optimize(METHOD_MIP);
