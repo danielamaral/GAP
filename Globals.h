@@ -23,6 +23,8 @@ public:
   static double Infinity() { return kInfinity_; };
   static double EPS() { return Epsilon_; };
   static double BigEPS() { return BigEpsilon_; }
+  static int SolverLog() { return SolverLog_; }
+  static void SetSolverLog(int x) { SolverLog_ = x; }
 private:
   Globals();
   Globals(const Globals&);
@@ -33,6 +35,7 @@ private:
 	static double kInfinity_;
   static double Epsilon_;
   static double BigEpsilon_;
+  static int SolverLog_;
 };
 
 enum FixingSense {

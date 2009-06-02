@@ -45,19 +45,22 @@ void ReadAndSolveMpsFile(const string& input_file) {
 int main(int argc, char* argv[]) {
   google::InitGoogleLogging(argv[0]);
 
-  const int kNumberArguments = 7;
+  const int kNumberArguments = 6;
   if (argc < kNumberArguments) {
     LOG(ERROR) << "Usage: " << argv[0] << " "
-               << "INSTANCE_FILE SOLVER RANDOM_SEED UPPER_BOUND ALGORITHM MAX_TIME";
+               << "INSTANCE_FILE SOLVER RANDOM_SEED "
+               << "ALGORITHM MAX_TIME [UPPER_BOUND] [SOLVER_LOG_LEVEL]";
     return argc;
   }
 
 	string instance_file(argv[1]);
   string formulacao(argv[2]);
 	int random_seed = atoi(argv[3]);
-	int upper_bound = atoi(argv[4]);
-	string algorithm(argv[5]);
-  int max_time = atoi(argv[6]);
+	string algorithm(argv[4]);
+  int max_time = atoi(argv[5]);
+  int upper_bound = (argc >= 7 ? atoi(argv[6]) : 0);
+  if (argc >= 8)
+    Globals::SetSolverLog(atoi(argv[7]));
 
   if (instance_file.find(".mps") != string::npos) {
     ReadAndSolveMpsFile(instance_file);

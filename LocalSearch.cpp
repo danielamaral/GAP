@@ -150,7 +150,6 @@ bool LocalSearch::EllipsoidalSearch(VnsSolver* solver,
     // Runs the solver
     sw->Start();
     SolverOptions options; options.set_max_time(TL / 1000.0); options.set_cut_off_value(UB);
-    //options.set_solver_log(true);
     SolverStatus status;
 		solver->Solve(options, &status);
 		sw->Stop();
@@ -259,6 +258,7 @@ void LocalSearch::VNSBra(SolverFactory* solver_factory,
   options.set_only_first_solution(true);
   // status = MIPSOLVE(TL, UB, first = true, x_opt, f_opt)
   solver_intensification->Solve(options, status);
+  CHECK(status->status == OPTSTAT_FEASIBLE || status->status == OPTSTAT_MIPOPTIMAL);
   if (status->status == OPTSTAT_MIPOPTIMAL)
     return;
   x_opt = status->final_sol;  // creates initial solution
@@ -399,12 +399,14 @@ uint64 LocalSearch::VNSIntensification(VnsSolver *solver_intensification,
     elapsed_time += sw->ElapsedMilliseconds;
     sw->Reset();
 
+    
     // TODO(danielrocha): this shouldn't be necessary, but CPLEX is not working
     // as I expected it to - I think it has something to do with the re-use of
     // previous solutions.
     if (status.status == OPTSTAT_MIPOPTIMAL || status.status == OPTSTAT_FEASIBLE)
-      if (status.final_sol == *x_cur || status.final_sol.cost() >= x_cur->cost())
-        status.status = OPTSTAT_INFEASIBLE;
+      CHECK_GT(x_cur->cost(), status.final_sol.cost());
+      //if (status.final_sol == *x_cur || status.final_sol.cost() >= x_cur->cost())
+      //  status.status = OPTSTAT_INFEASIBLE;
 
     switch(status.status) {
       case OPTSTAT_MIPOPTIMAL:
@@ -644,8 +646,8 @@ void LocalSearch::PathRelink(SolverFactory* solver_factory,
   {
     VnsSolver* solver = solver_factory->NewVnsSolver(Globals::instance());
     SolverOptions options;
-    options.set_max_time(local_search_time_ms / 1000.0);
-    //options.set_only_first_solution(true);
+    //options.set_max_time(local_search_time_ms / 1000.0);
+    options.set_only_first_solution(true);
     SolverStatus status;
     solver->Init(options);
     solver->Solve(options, &status);

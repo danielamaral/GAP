@@ -294,9 +294,11 @@ void SolverFormulacaoPadrao::Init(const SolverOptions& options) {
 
   lp_->setMIPRelTol(0.00);
 	lp_->setMIPAbsTol(0.00);
-  lp_->setParallelMode(-1);
+  //lp_->setParallelMode(-1);
   lp_->setRepeatPresolve(0);
   lp_->setRepairFrequency(-1);
+  //lp_->setMIPEmphasis(1);  // emphasis on feasibility, not optimality
+  lp_->setAdvance(OPT_FALSE);
   
   // Maximum 2.8 gigs, store the rest on disk (uncompressed).
   lp_->setWorkMem(3000);
@@ -337,8 +339,8 @@ void SolverFormulacaoPadrao::Init(const SolverOptions& options) {
 }
 
 /* static */ OPTSTAT SolverFormulacaoPadrao::GetFirstIntegerSolution(
-  const ProblemData& p,
-  ProblemSolution* sol) {
+    const ProblemData& p,
+    ProblemSolution* sol) {
   
   OPT_LP* lp = new OPT_CPLEX;
   VariableFormulacaoPadraoHash vHash;
@@ -359,9 +361,9 @@ void SolverFormulacaoPadrao::Init(const SolverOptions& options) {
 }
 
 /* static */ OPTSTAT SolverFormulacaoPadrao::GetIntegerSolutionWithTimeLimit(
-  const ProblemData& p,
-  int time_limit,
-  ProblemSolution* sol) {
+    const ProblemData& p,
+    int time_limit,
+    ProblemSolution* sol) {
   
   OPT_LP* lp = new OPT_CPLEX;
   VariableFormulacaoPadraoHash vHash;
@@ -396,7 +398,7 @@ void SolverFormulacaoPadrao::Init(const SolverOptions& options) {
 int SolverFormulacaoPadrao::Solve(const SolverOptions& options,
                                   SolverStatus* output_status) {
   int status = SolveTLAndUB(options.max_time(), options.cut_off_value(),
-                            options.solver_log(), options.only_first_solution());
+                            options.only_first_solution());
   if (output_status != NULL) {
     output_status->status = status;
     output_status->gap_absolute = GetGapAbsolute();
@@ -407,20 +409,17 @@ int SolverFormulacaoPadrao::Solve(const SolverOptions& options,
   return status;
 }
 
-int SolverFormulacaoPadrao::SolveTLAndUB(int time_limit, double upper_bound, bool log, bool first) {
+int SolverFormulacaoPadrao::SolveTLAndUB(int time_limit, double upper_bound, bool first) {
 	/** sets lp parameters */
-  //lp_->writeProbLP("SolverFormulacaoPadrao");
+  lp_->writeProbLP("SolverFormulacaoPadrao");
 	//lp_->setVarSel(3);
   //cout << "Time: " << time_limit;
-  if (log)
-    lp_->setMIPScreenLog(2);
-  else
-    lp_->setMIPScreenLog(0);
+  lp_->setMIPScreenLog(Globals::SolverLog());
   
-  if (time_limit > 0)
+  if (time_limit >= 0)
     lp_->setTimeLimit(time_limit);
   else
-    lp_->setTimeLimit(0);
+    lp_->setTimeLimit(1000000000);
 
 	if (upper_bound < Globals::Infinity())
     lp_->setMIPCutOff(upper_bound);
