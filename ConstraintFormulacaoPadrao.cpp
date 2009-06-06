@@ -65,23 +65,25 @@ std::string ConstraintFormulacaoPadrao::ToString() const
 {
     std::stringstream ss;
 
-	switch(type_)
-	{
-        case C_MACHINE_CAPACITY:
-            ss << "C_MACHINE_CAPACITY";
-			break;
-        case C_ONE_MACHINE_PER_TASK:
-            ss << "C_ONE_MACHINE_PER_TASK";
-			break;
-        case C_MAX_ASSIGNMENT_CHANGES:
-            ss << "C_MAX_ASSIGNMENT_CHANGES";
-            break;
-        case C_MAX_ASSIGNMENT_CHANGES_ELLIPSOIDAL:
-            ss << "C_MAX_ASSIGNMENT_CHANGES_ELLIPSOIDAL";
-            break;
-		default:
-            ss << "CError";			
-			break;
+	switch (type_) {
+    case C_MACHINE_CAPACITY:
+      ss << "C_MACHINE_CAPACITY";
+      break;
+    case C_ONE_MACHINE_PER_TASK:
+      ss << "C_ONE_MACHINE_PER_TASK";
+      break;
+    case C_MAX_ASSIGNMENT_CHANGES:
+      ss << "C_MAX_ASSIGNMENT_CHANGES";
+      break;
+    case C_MAX_ASSIGNMENT_CHANGES_ELLIPSOIDAL:
+      ss << "C_MAX_ASSIGNMENT_CHANGES_ELLIPSOIDAL";
+      break;
+    case C_UPPER_BOUND:
+      ss << "C_UPPER_BOUND";
+      break;
+    default:
+      ss << "CError";			
+      break;
 	}
 
 	// machine

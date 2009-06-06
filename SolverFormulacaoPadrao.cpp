@@ -51,6 +51,43 @@ SolverFormulacaoPadrao::~SolverFormulacaoPadrao() {
   return num_var;
 }
 
+void SolverFormulacaoPadrao::UpdateConsUpperBound(double upper) {
+  // constraint
+  ConstraintFormulacaoPadrao cons;
+  // variable
+  VariableFormulacaoPadrao var;
+
+  // creates the constraint
+  cons.reset();
+  cons.set_type(ConstraintFormulacaoPadrao::C_UPPER_BOUND);
+  ConstraintFormulacaoPadraoHash::iterator it = cHash_.find(cons);
+
+  if (it == cHash_.end()) {
+    cHash_[cons] = lp_->getNumRows();
+    int nnz = problem_data_->num_tasks();
+    OPT_ROW row(nnz, OPT_ROW::LESS, upper, (char*) cons.ToString().c_str());
+
+    // adds each variable
+    for (int i = 0; i < problem_data_->num_machines(); ++i) {
+      for (int j = 0; j < problem_data_->num_tasks(); ++j) {
+        var.reset();
+        var.set_type(VariableFormulacaoPadrao::X_ij);
+        var.set_machine(i);
+        var.set_task(j);
+        VariableFormulacaoPadraoHash::iterator vit = vHash_.find(var);
+
+        //CHECK_NE(vit, vHash_.end());
+
+        double cost = problem_data_->cost(i, j);
+        row.insert(vit->second, cost);
+      }
+    }
+    lp_->addRow(row);
+  } else {
+    lp_->chgRHS(it->second, upper);
+  }
+}
+
 /* static */ int SolverFormulacaoPadrao::CreateConsMachineCapacity(
   const ProblemData& problem,
   VariableFormulacaoPadraoHash* vHash,
@@ -294,7 +331,7 @@ void SolverFormulacaoPadrao::Init(const SolverOptions& options) {
 
   lp_->setMIPRelTol(0.00);
 	lp_->setMIPAbsTol(0.00);
-  //lp_->setParallelMode(-1);
+  lp_->setParallelMode(-1);
   lp_->setRepeatPresolve(0);
   lp_->setRepairFrequency(-1);
   //lp_->setMIPEmphasis(1);  // emphasis on feasibility, not optimality
@@ -411,7 +448,7 @@ int SolverFormulacaoPadrao::Solve(const SolverOptions& options,
 
 int SolverFormulacaoPadrao::SolveTLAndUB(int time_limit, double upper_bound, bool first) {
 	/** sets lp parameters */
-  lp_->writeProbLP("SolverFormulacaoPadrao");
+  //lp_->writeProbLP("SolverFormulacaoPadrao");
 	//lp_->setVarSel(3);
   //cout << "Time: " << time_limit;
   lp_->setMIPScreenLog(Globals::SolverLog());
@@ -421,9 +458,10 @@ int SolverFormulacaoPadrao::SolveTLAndUB(int time_limit, double upper_bound, boo
   else
     lp_->setTimeLimit(1000000000);
 
-	if (upper_bound < Globals::Infinity())
+  if (upper_bound < Globals::Infinity()) {
     lp_->setMIPCutOff(upper_bound);
-  else
+    //UpdateConsUpperBound(upper_bound - 1);
+  } else
     lp_->setMIPCutOff(1e75);
 
   if (first)

@@ -45,6 +45,8 @@ public:
   // sum(X_ij with negative cost) >= 1
   int AddConsIntegerSolutionStrongCuttingPlane(const ProblemSolution& sol);
 
+  void UpdateConsUpperBound(double upper);
+
   // Removes the constraint <cons_row>
   void RemoveConstraint(int cons_row);
   void RemoveConstraint(int cons_row_begin, int cons_row_end); // range removal

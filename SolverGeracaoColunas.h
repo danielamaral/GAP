@@ -79,6 +79,8 @@ class SolverGeracaoColunas : public VnsSolver {
   virtual int AddEllipsoidalConstraint(
       const vector<const ProblemSolution*>& x, OPT_ROW::ROWSENSE constraint_sense, int F);
 
+  void UpdateConsUpperBound(double upper) {}
+
 private:
   /********************************************************************
   **                       UTILITY METHODS                           **

@@ -173,4 +173,6 @@ class VnsSolver : public Solver {
       const vector<const ProblemSolution*>& x, int RHS) {
     return AddEllipsoidalConstraint(x, OPT_ROW::LESS, RHS);
   }
+
+  virtual void UpdateConsUpperBound(double upper) = 0;
 };
