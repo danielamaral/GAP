@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include "Globals.h"
+#include "logging.h"
 #include "ProblemData.h"
 
 using namespace std;
@@ -19,8 +20,9 @@ ProblemSolution::ProblemSolution(const ProblemSolution& p) {
   used_.resize(p.m(), 0);
 	Clear();
 
-  for (int i = 0; i < p.n(); ++i)
-    this->set_assignment(i, p.assignment(i));
+  if (p.assignment(0) >= 0)
+    for (int i = 0; i < p.n(); ++i)
+      this->set_assignment(i, p.assignment(i));
 }
 
 void ProblemSolution::set_assignment(int task, int machine) {
@@ -137,8 +139,7 @@ bool ProblemSolution::IsValidExchange(int task1, int task2) const {
 }
 
 void ProblemSolution::Exchange(int task1, int task2) {
-	if (!IsValidExchange(task1, task2))
-		return;
+	CHECK(IsValidExchange(task1, task2));
 	int mach1 = assignment(task1);
 	int mach2 = assignment(task2);
 	used_[mach1] = used_[mach1] - pd_->consume(mach1, task1) + pd_->consume(mach1, task2);

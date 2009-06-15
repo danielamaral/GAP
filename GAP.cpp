@@ -21,7 +21,7 @@ using namespace System::Diagnostics;
 #include "SolverGeracaoColunas.h"
 
 void ReadAndSolveMpsFile(const string& input_file) {
-  OPT_LP* lp = new OPT_CPLEX;
+  OPT_CPLEX* lp = new OPT_CPLEX;
   lp->readCopyMPS(const_cast<char*>(input_file.c_str()));
   lp->setSimplexScreenLog(1);
   const int kNumLpMethods = 7;
@@ -100,10 +100,12 @@ int main(int argc, char* argv[]) {
 
 	// input options and final status
 	SolverStatus status;
+  //PopulateStatus status;
 
 	if (algorithm == "CPLEX") {
 		sw->Start();
 		solver->Init(options);
+    //solver->Populate(options, &status);
 		solver->Solve(options, &status);
 		sw->Stop();
 	} else if (algorithm == "CPLEX-UB") {
@@ -125,7 +127,7 @@ int main(int argc, char* argv[]) {
   } else if (algorithm == "PathRelink") {
     sw->Start();
     LocalSearch::PathRelink(solver_factory, options.max_time() * 1000,
-                            60 * 1000, 1, &status);
+                            120 * 1000, 1, &status);
     sw->Stop();
   } else {
     LOG(FATAL) << "Inexistent algorithm specified: " << algorithm;

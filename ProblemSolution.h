@@ -83,10 +83,9 @@ private:
 struct CompareSolutionPtrsByAssignment {
   bool operator()(ProblemSolution* a, ProblemSolution* b) const {
     for (int i = 0; i < a->n(); ++i) {
-      int x = a->assignment(i) - b->assignment(i);
-      if (x > 0)
+      if (a->assignment(i) < b->assignment(i))
         return true;
-      else if (x < 0)
+      if (a->assignment(i) > b->assignment(i))
         return false;
     }
     return false;

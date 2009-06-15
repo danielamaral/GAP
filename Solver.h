@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Globals.h"
+#include "logging.h"
 #include "opt_row.h"
 #include "ProblemSolution.h"
 
@@ -11,18 +12,22 @@ class ProblemSolution;
 
 class Solver;
 class VnsSolver;
+class PopulateOptions;
 class SolverStatus;
 class SolverOptions;
 class SolverFactory;
 
 class SolverOptions {
 public:
-  void Clear() {
+  virtual void Clear() {
     only_first_solution_ = false;
     cut_off_value_ = Globals::Infinity();
     use_stabilization_ = true;
     max_time_ = -1;  // No time limit.
-    time_for_first_solution_ = 180;  // A standard initial value.
+    time_for_first_solution_ = 300;  // A standard initial value.
+    rins_period_ = 10;
+    emphasis_on_feasibility_ = true;
+    emphasis_on_optimality_ = true;
   }
 
   SolverOptions() {
@@ -35,13 +40,18 @@ public:
   int time_for_first_solution() const { return time_for_first_solution_; }
   bool only_first_solution() const { return only_first_solution_; }
   bool use_stabilization() const { return use_stabilization_; }
+  int rins_period() const { return rins_period_; }
+  bool emphasis_on_feasibility() const { return emphasis_on_feasibility_; }
+  bool emphasis_on_optimality() const { return emphasis_on_optimality_; }
 
   // Setters
+  void set_emphasis_on_feasibility(bool v) { emphasis_on_feasibility_ = v; }
+  void set_emphasis_on_optimality(bool v) { emphasis_on_optimality_ = v; }
   void set_cut_off_value(double v) { cut_off_value_ = v; }
   void set_max_time(int t) { max_time_ = t; }
   void set_only_first_solution(bool v) { only_first_solution_ = v; }
   void set_use_stabilization(bool v) { use_stabilization_ = v; }
-  void set_time_for_first_solution(int t) { time_for_first_solution_ = (t > 0 ? t : 180); }
+  void set_time_for_first_solution(int t) { time_for_first_solution_ = (t > 0 ? t : 10); }
   void set_relative_time_for_first_solution(int instance_size) {
     time_for_first_solution_ = std::max(time_for_first_solution_,
                                         CalculateDefaultFirstSolutionTime(instance_size));
@@ -68,6 +78,42 @@ public:
   int max_time_;
   int time_for_first_solution_;
   bool use_stabilization_;
+  int rins_period_;
+  bool emphasis_on_feasibility_, emphasis_on_optimality_;
+};
+
+
+class PopulateOptions : public SolverOptions {
+public:
+  virtual void Clear() {
+    SolverOptions::Clear();
+    num_max_solutions_ = 30;
+    gap_ = 1e+75;
+    replace_mode_ = 2;
+    intensity_ = 3;
+  }
+
+  PopulateOptions() {
+    Clear();
+  }
+
+  // Getters
+  int num_max_solutions() const { return num_max_solutions_; }
+  double gap() const { return gap_; }
+  int replace_mode() const { return replace_mode_; }
+  int intensity() const { return intensity_; }
+
+  // Setters
+  void set_num_max_solutions(int x) { num_max_solutions_ = x; }
+  void set_gap(double x) { gap_ = x; }
+  void set_replace_mode(int v) { CHECK(0 <= v && v <= 2); replace_mode_ = v; }
+  void set_intensity(int v) { CHECK(0 <= v && v <= 4); intensity_ = v; }
+
+ protected:
+  int num_max_solutions_;
+  double gap_;
+  int replace_mode_;
+  int intensity_;
 };
 
 class SolverStatus {
@@ -96,6 +142,14 @@ public:
   double time_to_best_solution;
   int total_num_nodes;
   int node_with_best_result;
+};
+
+class PopulateStatus : public SolverStatus{
+public:
+	PopulateStatus() { SolverStatus(); }
+  double mean_objective_value;
+  int num_replaced_sols;
+  vector<ProblemSolution> solution_set;
 };
 
 class SolverFactory {
@@ -127,6 +181,8 @@ public:
    */
    virtual int Solve(const SolverOptions& options,
                      SolverStatus* status) = 0;
+   virtual int Populate(const PopulateOptions& options,
+                        PopulateStatus* status) = 0;
    virtual void Init(const SolverOptions& options) = 0;
 
    /**

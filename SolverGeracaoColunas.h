@@ -9,7 +9,7 @@
 using namespace System::Diagnostics;
 
 #include "solver.h"
-#include "opt_lp.h"
+#include "opt_cplex.h"
 #include "ConstraintGeracaoColunas.h"
 #include "Globals.h"
 #include "ProblemSolution.h"
@@ -47,6 +47,7 @@ class SolverGeracaoColunas : public VnsSolver {
   **                SOLVING AND RESULTS METHODS                      **
   *********************************************************************/
 	int Solve(const SolverOptions& options, SolverStatus* status);
+  int Populate(const PopulateOptions& options, PopulateStatus* status) {return -1;}
   
   /// Initializes the problem (creates variables and constraints)
   void Init(const SolverOptions& options);
@@ -54,7 +55,7 @@ class SolverGeracaoColunas : public VnsSolver {
   /// Generates a ProblemSolution from the X vector
   void GenerateSolution(const ProblemData& p,
                         const VariableGeracaoColunasContainer& vContainer,
-                        const OPT_LP& lp,
+                        const OPT_CPLEX& lp,
                         ProblemSolution* sol) const;
   void GenerateSolution(ProblemSolution* sol);
 
@@ -80,6 +81,8 @@ class SolverGeracaoColunas : public VnsSolver {
       const vector<const ProblemSolution*>& x, OPT_ROW::ROWSENSE constraint_sense, int F);
 
   void UpdateConsUpperBound(double upper) {}
+
+  bool RINS(const vector<vector<double> >& x, ProblemSolution* best_solution, int time_limit);
 
 private:
   /********************************************************************
@@ -107,50 +110,50 @@ private:
 
   void AddNewColumnWithTasks(double cost, double lower_bound, double upper_bound,
                              int machine, int num_tasks, short* tasks,
-                             VariableGeracaoColunasContainer* vContainer, OPT_LP* lp);
+                             VariableGeracaoColunasContainer* vContainer, OPT_CPLEX* lp);
 
   void AddNewColumnReuseTasks(const VariableGeracaoColunas& var,
                               double lower_bound, double upper_bound,
-                              VariableGeracaoColunasContainer* vContainer, OPT_LP* lp);
+                              VariableGeracaoColunasContainer* vContainer, OPT_CPLEX* lp);
 
   void AddStabilizationColumnsWithCoeficients(
       const ProblemData& p, const vector<double>& relaxed_dual_values,
-      VariableGeracaoColunasContainer* vContainer, OPT_LP* lp);
+      VariableGeracaoColunasContainer* vContainer, OPT_CPLEX* lp);
 
   OPTSTAT AddInitialColumns(bool first, int time_limit,
                             ProblemSolution* integer_solution);
 
   void AddIntegerSolutionColumnsWithCoeficients(
       const ProblemData& p, const ProblemSolution& integer_solution,
-      VariableGeracaoColunasContainer* vContainer, OPT_LP* lp);
+      VariableGeracaoColunasContainer* vContainer, OPT_CPLEX* lp);
 
   /********************************************************************
   **                    CONSTRAINT CREATION                          **
   *********************************************************************/
   void AddSumAssignmentsPerTaskEqualsOneConstraints(
-      const ProblemData& pd, ConstraintGeracaoColunasHash* cHash, OPT_LP* lp);
+      const ProblemData& pd, ConstraintGeracaoColunasHash* cHash, OPT_CPLEX* lp);
   void AddSumAssignmentsPerMachineAtMostOneConstraints(
-      const ProblemData& pd, ConstraintGeracaoColunasHash* cHash, OPT_LP* lp);
+      const ProblemData& pd, ConstraintGeracaoColunasHash* cHash, OPT_CPLEX* lp);
 
   /********************************************************************
   **                   COLUMN GENERATION METHODS                     **
   *********************************************************************/
   void AdjustStabilizationBounds(
     const ProblemData& p, double bound,
-    const VariableGeracaoColunasContainer& vContainer, OPT_LP* lp);
+    const VariableGeracaoColunasContainer& vContainer, OPT_CPLEX* lp);
 
   void UpdateStabilizationCosts(
     const ProblemData& p, const vector<double>& dual_values, 
-    VariableGeracaoColunasContainer* vContainer, OPT_LP* lp);
+    VariableGeracaoColunasContainer* vContainer, OPT_CPLEX* lp);
 
   double GenerateColumnsWithStabilization(const ProblemData& p,
-                                          OPT_LP* lp,
+                                          OPT_CPLEX* lp,
                                           int* num_columns,
                                           vector<vector<short> >* fixed_vars,
                                           double best_solution_value);
 
   double GenerateColumns(const ProblemData& p,
-                         OPT_LP* lp,
+                         OPT_CPLEX* lp,
                          int* num_columns,
                          vector<vector<short> >* fixed_vars,
                          double best_solution_value);
@@ -158,7 +161,7 @@ private:
   void RemoveExcessColumns(const ProblemData& pd,
                            int num_columns_to_remove,
                            VariableGeracaoColunasContainer* vContainer,
-                           OPT_LP* lp);
+                           OPT_CPLEX* lp);
 
   /********************************************************************
   **                    BRANCH AND BOUND METHODS                     **
@@ -167,7 +170,7 @@ private:
                                     int num_nodes_limit,
                                     double cut_off_value,
                                     bool first_only,
-                                    OPT_LP* lp,
+                                    OPT_CPLEX* lp,
                                     ProblemSolution* integer_solution);
 
   /// Returns a lower bound
@@ -177,7 +180,7 @@ private:
             double lower_bound,
             double cut_off_value,
             bool first_only,
-            OPT_LP* lp,
+            OPT_CPLEX* lp,
             ProblemSolution* best_solution,
             vector<vector<short> >* fixed_vars,
             int* num_columns,
@@ -201,7 +204,7 @@ private:
     FixingSense fixing_sense, int fixed_machine, int fixed_task,
     int num_nodes_limit, double lower_bound, double cut_off_value,
     bool first_only, const ProblemData& p,
-    OPT_LP* lp, ProblemSolution* best_solution,
+    OPT_CPLEX* lp, ProblemSolution* best_solution,
     vector<vector<short> >* fixed_vars,
     int* num_columns, int depth, double* pct_tree_solved,
     int* num_visited_nodes, OPTSTAT* status);
@@ -210,22 +213,24 @@ private:
   // a serem fixadas. Depois pega essas candidatas e submete a um
   // rápido ("raso") BB para escolher a que gera o melhor lower bound.
   int SelectFixedVariable(const ProblemData& p, int num_vars_lookup,
-                          const vector<vector<double> >& x, double cut_off, OPT_LP* lp,
+                          const vector<vector<double> >& x, double cut_off, OPT_CPLEX* lp,
                           ProblemSolution* best_solution,
                           vector<vector<short> >* fixed_vars, int* num_columns,
                           int* fixed_machine, int* fixed_task);
 
   double EvaluateVariableToFix(double binary_var);
 
-  OPT_LP* lp_;
+  OPT_CPLEX* lp_;
   int total_num_nodes_;
   int column_count_;
   bool stabilize_column_generation_;
   bool has_generated_initial_columns_;
+  int rins_period_;
 
   /** Some interesting statistics from the solving */
   double root_lower_bound_;
   int node_with_best_result_;
+  double time_to_best_result_;
 
   /** Internal variables to control the time limits */
   gcroot<Stopwatch ^> stopwatch_;

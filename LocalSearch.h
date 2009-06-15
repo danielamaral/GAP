@@ -27,14 +27,11 @@ namespace LocalSearch {
 		NUM_PARAMS
 	};
 
-  void SimpleOPTSearch(
-      const ProblemSolution& init_sol,
-      int max_opt,
-      int k_step,
-      int total_time,
-      int initial_time,
-      int ls_time,
-      ProblemSolution* sol);
+  void SimpleOPTSearch(VnsSolver* solver,
+                       int opt,
+                       uint64 time_limit,
+                       int log,
+                       ProblemSolution* sol);
 
   void GetEllipsoidalBounds(const vector<const ProblemSolution*>& sols,
                             int* minimum_f, int* maximum_f);
@@ -47,7 +44,7 @@ namespace LocalSearch {
       int log,
       bool only_first_solution,
       uint64* time_elapsed_ms,
-      ProblemSolution* final_sol);
+      vector<ProblemSolution*>* final_sols);
 
   void MultiEllipsoidalSearch();
 

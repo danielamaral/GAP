@@ -3,7 +3,7 @@
 #include <fstream>
 #include <sstream>
 #include "solver.h"
-#include "opt_lp.h"
+#include "opt_cplex.h"
 #include "ConstraintFormulacaoPadrao.h"
 #include "Globals.h"
 #include "ProblemSolution.h"
@@ -16,6 +16,7 @@ public:
   ~SolverFormulacaoPadrao();
   /// Solves the problem
 	int Solve(const SolverOptions& options, SolverStatus* status);
+  int Populate(const PopulateOptions& options, PopulateStatus* status);
 
 	double GetGapRelative();
 	double GetGapAbsolute();
@@ -25,7 +26,8 @@ public:
 
   /// Generates a ProblemSolution from the output of the solver.
   void GenerateSolution(ProblemSolution* ps);
-  static void GenerateSolution(OPT_LP* lp,
+  static void GenerateSolution(const vector<double>& x,
+                               OPT_CPLEX* lp,
                                VariableFormulacaoPadraoHash* vHash,
                                ConstraintFormulacaoPadraoHash* cHash,
                                ProblemSolution* ps);
@@ -58,6 +60,9 @@ public:
 	int AddEllipsoidalConstraint(
 		  const vector<const ProblemSolution*>& x, OPT_ROW::ROWSENSE constraint_sense, int F);
 
+  // Used in RINS (SolverGeracaoColunas);
+  void FixVar(int machine, int task, bool value);
+
   // A partir de um problema dado, gera a formulação e retorna o valor das
   // variáveis duais no problema relaxado (a.k.a. a relaxação linear do
   // problema).
@@ -78,7 +83,7 @@ private:
     const ProblemData& problem,
     const OPT_COL::VARTYPE variable_type,
     VariableFormulacaoPadraoHash* vHash,
-    OPT_LP* lp);
+    OPT_CPLEX* lp);
 
 	// Sets the variable x_task,machine with a coeficient
 	// 'coef' in constraint cons_row
@@ -93,17 +98,17 @@ private:
     const ProblemData& problem,
     VariableFormulacaoPadraoHash* vHash,
     ConstraintFormulacaoPadraoHash* cHash,
-    OPT_LP* lp);
+    OPT_CPLEX* lp);
 
   /** Creates the constraint of only one machine assigned per task */
   static int CreateConsOneMachinePerTask(
     const ProblemData& problem,
     VariableFormulacaoPadraoHash* vHash,
     ConstraintFormulacaoPadraoHash* cHash,
-    OPT_LP* lp);
+    OPT_CPLEX* lp);
 
   /** The optimizer and the status variables */
-  OPT_LP* lp_;
+  OPT_CPLEX* lp_;
   OPTSTAT lp_status_;
   char lp_status_str_[120];
   std::ofstream log_;
