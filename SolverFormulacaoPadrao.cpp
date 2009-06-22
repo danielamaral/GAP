@@ -424,16 +424,24 @@ void SolverFormulacaoPadrao::Init(const SolverOptions& options) {
   lp_->setMIPRelTol(0.00);
 	lp_->setMIPAbsTol(0.00);
   lp_->setParallelMode(-1);
-  lp_->setRepeatPresolve(0);
-  lp_->setRepairFrequency(-1);
   if (options.emphasis_on_feasibility() && options.emphasis_on_optimality())
     lp_->setMIPEmphasis(0);
   else if (options.emphasis_on_feasibility())
     lp_->setMIPEmphasis(1);
   else if (options.emphasis_on_optimality())
     lp_->setMIPEmphasis(2);
+  
+  if (options.continue_from_previous()) {
+    lp_->setRepeatPresolve(1);
+    lp_->setRepairFrequency(0);
+    lp_->setAdvance(OPT_TRUE);
+  } else {
+    lp_->setRepeatPresolve(0);
+    lp_->setRepairFrequency(-1);
+    lp_->setAdvance(OPT_FALSE);
+  }
+
   lp_->setMIPScreenLog(Globals::SolverLog());
-  lp_->setAdvance(OPT_FALSE);
   // Resets the populate parameters
   lp_->setSolPoolIntensity(0);
   lp_->setSolPoolGap(1e75);
@@ -462,10 +470,15 @@ void SolverFormulacaoPadrao::Init(const SolverOptions& options) {
 
 int SolverFormulacaoPadrao::Populate(const PopulateOptions& options,
                                      PopulateStatus* output_status) {
+  lp_->setRepeatPresolve(0);
+  lp_->setRepairFrequency(-1);
+  lp_->setAdvance(OPT_FALSE);
+
   lp_->setPopulateLimit(options.num_max_solutions());
   lp_->setSolPoolGap(options.gap());
   lp_->setSolPoolReplace(options.replace_mode());
   lp_->setSolPoolIntensity(options.intensity());
+
   if (options.max_time() > 0)
     lp_->setTimeLimit(options.max_time());
   if (options.cut_off_value() < Globals::Infinity())
@@ -493,6 +506,9 @@ int SolverFormulacaoPadrao::Populate(const PopulateOptions& options,
         GenerateSolution(
             x, lp_, &vHash_, &cHash_,
             &output_status->solution_set[output_status->solution_set.size() - 1]);
+        if (output_status->solution_set[output_status->solution_set.size() - 1] ==
+            output_status->solution_set[0])
+          output_status->solution_set.pop_back();
       }
     }
   }

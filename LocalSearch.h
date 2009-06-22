@@ -10,6 +10,7 @@
 #include "SolverFormulacaoPadrao.h"
 
 class ProblemSolution;
+class FixedSizeSolutionSet;
 
 namespace LocalSearch {
 	enum Params {
@@ -42,16 +43,18 @@ namespace LocalSearch {
       uint64 total_time_ms,
       uint64 step_time_ms,
       int log,
-      bool only_first_solution,
+      int num_solutions,
       uint64* time_elapsed_ms,
-      vector<ProblemSolution*>* final_sols);
+      vector<ProblemSolution*>* final_sols,
+      double initial_UB = 1e18);
 
   void MultiEllipsoidalSearch();
 
 	// VNS, returns the total elapsed time in the method
 	uint64 VNSIntensification(
       VnsSolver *solver_intensification,
-      int max_opt,
+      int initial_opt,
+      int step_opt,
       uint64 total_time_ms,
       uint64 node_time_ms,
       int log_level,
@@ -76,15 +79,26 @@ namespace LocalSearch {
 		SolverStatus* final_status);
 
   // Path relink
-  void RandomlyMutateSolutionWithPrecalc(const vector<pair<int, int> >& exchanges, 
-                                         int num_mutations, ProblemSolution* sol);
   void RandomlyMutateSolution(int num_mutations, ProblemSolution* sol);
+  void PickNSolutions(int N, int log, const FixedSizeSolutionSet& R,
+                      vector<const ProblemSolution*>* sols);
   void PathRelink(
     SolverFactory* solver_factory,
     uint64 total_time_ms,
     uint64 local_search_time_ms,
     int log_level,
     SolverStatus* status);
+
+  void CalculateDistances(int num_sols, const FixedSizeSolutionSet& R,
+                          const vector<vector<int> >& distance,
+                          vector<pair<int, vector<int> > >* sols);
+
+  void PostProcessing(
+      SolverFactory* solver_factory,
+      uint64 total_time_ms,
+      uint64 local_search_time_ms,
+      int log,
+      SolverStatus* final_status);
 };
 
 #endif

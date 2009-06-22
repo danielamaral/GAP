@@ -28,6 +28,7 @@ public:
     rins_period_ = 10;
     emphasis_on_feasibility_ = true;
     emphasis_on_optimality_ = true;
+    continue_from_previous_ = false;
   }
 
   SolverOptions() {
@@ -43,8 +44,10 @@ public:
   int rins_period() const { return rins_period_; }
   bool emphasis_on_feasibility() const { return emphasis_on_feasibility_; }
   bool emphasis_on_optimality() const { return emphasis_on_optimality_; }
+  bool continue_from_previous() const { return continue_from_previous_; }
 
   // Setters
+  void set_continue_from_previos(bool v) { continue_from_previous_ = v; }
   void set_emphasis_on_feasibility(bool v) { emphasis_on_feasibility_ = v; }
   void set_emphasis_on_optimality(bool v) { emphasis_on_optimality_ = v; }
   void set_cut_off_value(double v) { cut_off_value_ = v; }
@@ -80,6 +83,7 @@ public:
   bool use_stabilization_;
   int rins_period_;
   bool emphasis_on_feasibility_, emphasis_on_optimality_;
+  bool continue_from_previous_;
 };
 
 

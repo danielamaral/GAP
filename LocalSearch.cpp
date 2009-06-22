@@ -37,7 +37,7 @@ void LocalSearch::SimpleOPTSearch(VnsSolver* solver,
 }
 
 void LocalSearch::GetEllipsoidalBounds(const vector<const ProblemSolution*>& sols,
-                                       int* minimum_f, int* maximum_f) {
+                                       int* minimum_lhs, int* maximum_lhs) {
   // On top is the smallest among the largest
   priority_queue<int, vector<int>, greater<int> > biggest_weights;
   // On top is the largest among the smallest
@@ -85,8 +85,8 @@ void LocalSearch::GetEllipsoidalBounds(const vector<const ProblemSolution*>& sol
     smallest_weights.pop();
   }
 
-  *maximum_f = N * sols.size() - min_feasible_dist;
-  *minimum_f = N * sols.size() - max_feasible_dist;
+  *maximum_lhs = N * sols.size() - min_feasible_dist;
+  *minimum_lhs = N * sols.size() - max_feasible_dist;
 }
 
 bool LocalSearch::EllipsoidalSearch(VnsSolver* solver,
@@ -94,9 +94,10 @@ bool LocalSearch::EllipsoidalSearch(VnsSolver* solver,
                                     uint64 total_time_ms,
                                     uint64 step_time_ms,
                                     int log,
-                                    bool only_first_solution,
+                                    int num_solutions,
                                     uint64* time_elapsed_ms,
-                                    vector<ProblemSolution*>* final_sols) {
+                                    vector<ProblemSolution*>* final_sols,
+                                    double initial_UB) {
 
 #define RHS(F) (Globals::instance()->n() * sols.size() - (F))
   // to keep the time
@@ -107,19 +108,29 @@ bool LocalSearch::EllipsoidalSearch(VnsSolver* solver,
   int min_opt, max_opt;
   GetEllipsoidalBounds(sols, &min_opt, &max_opt);
 
-  double initial_UB = 0.0;
-  for (int i = 0; i < sols.size(); ++i)
-    initial_UB = max<double>(sols[i]->cost(), initial_UB);
+  double UB = initial_UB;
+  if (initial_UB >= 1e18 - 1.0) {
+    if (num_solutions > 0) {
+      UB = 0.0;
+      for (int i = 0; i < sols.size(); ++i)
+        UB += sols[i]->cost();
+      UB /= sols.size();
+    } else {
+      for (int i = 0; i < sols.size(); ++i)
+        UB = min<double>(UB, sols[i]->cost());
+    }
+  }
 
   bool feasible = false;
-  bool cont = true;
   int rhs = min_opt + 2;
-  int k_step = 8;
+  int k_step = 16;
   deque<int> added_cons;
+
+  bool cont = true;
   while (cont && *time_elapsed_ms < total_time_ms && rhs + k_step <= max_opt) {
+    cont = false;
     uint64 TL = (*time_elapsed_ms + step_time_ms > total_time_ms ?
                  total_time_ms - *time_elapsed_ms : step_time_ms);
-    double UB = initial_UB;
     VLOG(log) << "EllipsoidalSearch: adding constraint " << rhs << " <= SUM <= "
               << rhs + k_step << ", UB: " << UB << ", time limit: " << TL / 1000.0;
 
@@ -131,9 +142,16 @@ bool LocalSearch::EllipsoidalSearch(VnsSolver* solver,
 
     // Runs the solver
     sw->Start();
-    PopulateOptions options; options.set_max_time(TL / 1000.0); options.set_cut_off_value(UB);
+    PopulateOptions options;
+    options.set_max_time(TL / 1000.0);
+    options.set_cut_off_value(UB);
+    options.set_num_max_solutions(num_solutions);
+    //options.set_num
     PopulateStatus status;
-		solver->Populate(options, &status);
+    if (num_solutions >= 1)
+		  solver->Populate(options, &status);
+    else
+      solver->Solve(options, &status);
 		sw->Stop();
 		*time_elapsed_ms += sw->ElapsedMilliseconds;
 		sw->Reset();
@@ -141,22 +159,25 @@ bool LocalSearch::EllipsoidalSearch(VnsSolver* solver,
     switch (status.status) {
       case OPTSTAT_MIPOPTIMAL:
       case OPTSTAT_FEASIBLE:
+        CHECK_LT(status.solution_set[0].cost(), UB);
         for (int i = 0; i < status.solution_set.size(); ++i) {
           ProblemSolution* new_sol = new ProblemSolution(status.solution_set[i]);
           final_sols->push_back(new_sol);
         }
+        if (status.solution_set.size() == 0)
+          final_sols->push_back(new ProblemSolution(status.final_sol));
         VLOG(log) << "EllipsoidalSearch: optimal/feasible for rhs: " << rhs << ", cost : "
                   << status.final_sol.cost() << ", time elapsed: " << *time_elapsed_ms
-                  << ", best solution: " << (*final_sols)[0]->cost();
-        feasible = true;
+                  << ", best solution: " << status.final_sol.cost();
+        feasible = cont = true;
+        UB = status.final_sol.cost();
         break;
       case OPTSTAT_INFEASIBLE:
         VLOG(log) << "EllipsoidalSearch: infeasible for rhs: " << rhs << ", time elapsed: "
                   << *time_elapsed_ms << ", new rhs: " << rhs + 1;
         break;
       case OPTSTAT_NOINTEGER:
-        VLOG(log) << "EllipsoidalSearch: no integer solution for rhs:  " << rhs
-                  << ", breaking out of search.";
+        VLOG(log) << "EllipsoidalSearch: no integer solution for rhs:  " << rhs;
         break;
     }
 
@@ -167,13 +188,12 @@ bool LocalSearch::EllipsoidalSearch(VnsSolver* solver,
       solver->RemoveConstraint(added_cons.back());
       added_cons.pop_back();
     }
-
-    if (feasible && only_first_solution)
-      break;
 	}
 
-  VLOG(log) << "EllipsoidalSearch: finished, time spent: " << *time_elapsed_ms / 1000.0
-            << ", best solution: " << (*final_sols)[0]->cost();
+  if (feasible)
+    VLOG(log) << "EllipsoidalSearch: success, time spent: " << *time_elapsed_ms / 1000.0;
+  else
+    VLOG(log) << "EllipsoidalSearch: fail, time spent: " << *time_elapsed_ms / 1000.0;
 
 	return feasible;
 #undef RHS
@@ -247,7 +267,7 @@ void LocalSearch::VNSBra(SolverFactory* solver_factory,
               << static_cast<double>(elapsed_ms) / 1000.0 << "s" << endl;
     uint64 time_to_best = 0;
 		uint64 intensif_time =
-        VNSIntensification(solver_intensification, Globals::instance()->n(),
+        VNSIntensification(solver_intensification, 2, 1,
                            total_time_ms - static_cast<int>(elapsed_ms),
                            node_time_ms, 0, &time_to_best, &x_cur);
 
@@ -336,7 +356,8 @@ void LocalSearch::VNSBra(SolverFactory* solver_factory,
 }
 
 uint64 LocalSearch::VNSIntensification(VnsSolver *solver_intensification,
-                                       int max_opt,
+                                       int initial_opt,
+                                       int step_opt,
                                        uint64 total_time_ms,
                                        uint64 node_time_ms,
                                        int log,
@@ -351,8 +372,8 @@ uint64 LocalSearch::VNSIntensification(VnsSolver *solver_intensification,
 	deque<int> added_cons;
 
   bool cont = true;
-  int rhs = 2;
-  while (cont && elapsed_time < total_time_ms && rhs < max_opt) {
+  int rhs = initial_opt;
+  while (cont && elapsed_time < total_time_ms && rhs < Globals::instance()->n()) {
     int TL = min(node_time_ms, total_time_ms - static_cast<int>(elapsed_time));
     VLOG_EVERY_N(log + 1, 20)
         << "VNSInt: Adding local branching constraint delta(x, x_cur) "
@@ -386,20 +407,20 @@ uint64 LocalSearch::VNSIntensification(VnsSolver *solver_intensification,
         CHECK_LT(status.final_sol.cost(), x_cur->cost());
         *time_to_sol = elapsed_time;
         *x_cur = status.final_sol;
-        VLOG(log) << "VNSInt: new best solution, cost: " << x_cur->cost();
-        rhs = 2;
+        VLOG(log) << "VNSInt: new best solution (optimal), cost: " << x_cur->cost();
+        rhs = initial_opt;
         break;
       case OPTSTAT_FEASIBLE:
         VLOG(log + 2)  << "VNSInt: feasible, reverting constraint to delta(x, x_cur) >= "
-                  << 2 << " (<= " << RHS(2) << ")";
+                       << 2 << " (<= " << RHS(2) << ")";
         // reverse last local branching constraint into delta(x, x_cur) >= 1
         solver_intensification->ReverseConstraint(added_cons.back(), RHS(2));
         //x_cur = x_next, f_cur = f_next;
         CHECK_LT(status.final_sol.cost(), x_cur->cost());
         *time_to_sol = elapsed_time;
         *x_cur = status.final_sol;
-        VLOG(log) << "VNSInt: new best solution, cost: " << x_cur->cost();
-        rhs = 2;
+        VLOG(log) << "VNSInt: new best solution (feasible), cost: " << x_cur->cost();
+        rhs = initial_opt;
         break;
       case OPTSTAT_INFEASIBLE:
         VLOG(log + 2)  << "VNSInt: proven infeasible, removing last constraint, "
@@ -407,7 +428,7 @@ uint64 LocalSearch::VNSIntensification(VnsSolver *solver_intensification,
         // remove last local branching constraint;
         solver_intensification->RemoveConstraint(added_cons.back());
         added_cons.pop_back();
-        rhs += 1;
+        rhs += step_opt;
         break;
       case OPTSTAT_NOINTEGER:
         VLOG(log)  << "VNSInt: no integer solution, breaking out of the search";
@@ -555,7 +576,8 @@ void LocalSearch::MIPMemetic(SolverStatus *final_status) {
 		for (int i = 0; i < params[POPULATION_SIZE] && elapsed_time < params[TOTAL_TIME]; ++i) {
 			elapsed_time += VNSIntensification(
 				&solver_inten,
-				inten_params[MAX_OPT],
+				2,
+        1,
 				inten_params[TOTAL_TIME],
 				inten_params[STEP_TIME],
         FLAGS_v,
@@ -578,15 +600,6 @@ finalize:
 	final_status->time = elapsed_time / 1000.0;
 }
 
-void LocalSearch::RandomlyMutateSolutionWithPrecalc(
-    const vector<pair<int, int> >& exchanges, int num_mutations, ProblemSolution* sol) {
-  for (int mutations = 0; mutations < num_mutations; ++mutations) {
-    // Picks a random exchange
-    int e = Globals::rg()->IRandom(0, exchanges.size() - 1);
-    sol->Exchange(exchanges[e].first, exchanges[e].second);
-  }
-}
-
 void LocalSearch::RandomlyMutateSolution(
     int num_mutations, ProblemSolution* sol) {
   int mutations = 0;
@@ -602,6 +615,21 @@ void LocalSearch::RandomlyMutateSolution(
   }
 }
 
+void LocalSearch::PickNSolutions(int N, int log, const FixedSizeSolutionSet& R,
+                                 vector<const ProblemSolution*>* sols) {
+  sols->reserve(N);
+  set<int> sol_indices;
+  while (sol_indices.size() < N) {
+    int sol_to_insert = Globals::rg()->IRandom(0, R.size() - 1);
+    if (sol_indices.insert(sol_to_insert).second) {
+      sols->push_back(R.GetSolutionPtr(sol_to_insert));
+      VLOG(log)
+          << "Selecting solution " << sol_to_insert << ", cost: "
+          << sols->at(sols->size() - 1)->cost();
+    }
+  }
+}
+
 void LocalSearch::PathRelink(SolverFactory* solver_factory,
                              uint64 total_time_ms,
                              uint64 local_search_time_ms,
@@ -612,13 +640,14 @@ void LocalSearch::PathRelink(SolverFactory* solver_factory,
   uint64 time_to_best = 0;
 
   // Gerar um conjunto de soluções aleatórias em R
-  const int kSetSize = 15;
+  const int kSetSize = 10;
   FixedSizeSolutionSet R(kSetSize);
   {
     VnsSolver* solver = solver_factory->NewVnsSolver(Globals::instance());
     PopulateOptions options;
-    options.set_max_time(local_search_time_ms /** 3*/ / 1000.0);
-    options.set_num_max_solutions(kSetSize);
+    options.set_max_time(local_search_time_ms * 5 / 1000.0);
+    options.set_num_max_solutions(200);
+    //options.set_num_max_solutions(kSetSize);
     PopulateStatus status;
     solver->Init(options);
     sw->Start();
@@ -633,83 +662,68 @@ void LocalSearch::PathRelink(SolverFactory* solver_factory,
       VLOG(log) << "PathRelink: adding initial solution " << sol << " (from CPLEX), cost: "
                 << status.solution_set[sol].cost();
       R.AddSolution(status.solution_set[sol]);
+      if (status.solution_set[sol].cost() < final_status->final_sol.cost()) {
+        final_status->final_sol = status.solution_set[sol];
+        time_to_best = elapsed_time;
+      }
     }
 
     for (int sol = status.solution_set.size(); sol < kSetSize; ++sol) {
       sw->Start();
       ProblemSolution first_solution = status.final_sol;
-      RandomlyMutateSolution(Globals::rg()->IRandom(10, 30), &first_solution);
+      RandomlyMutateSolution(Globals::rg()->IRandom(30, 60), &first_solution);
+      uint64 local_time_to_best = 0;
+      LocalSearch::SimpleOPTSearch(solver, 10, local_search_time_ms,
+                                   log + 1, &first_solution);
+      //LocalSearch::VNSIntensification(
+      //    solver, 10, 10, local_search_time_ms,
+      //    local_search_time_ms / 2, log + 1, &local_time_to_best, &first_solution);
       R.AddSolution(first_solution);
-      VLOG(log) << "PathRelink: adding initial random solution " << sol << ", cost: "
-                << first_solution.cost();
+      if (first_solution.cost() < final_status->final_sol.cost()) {
+        final_status->final_sol = first_solution;
+        time_to_best = elapsed_time + local_time_to_best;
+      }
+
+      VLOG(log) << "PathRelink: adding initial solution " << sol
+                << " (from local search), cost: " << first_solution.cost();
       sw->Stop(); elapsed_time += sw->ElapsedMilliseconds; sw->Reset();
     }
 
     delete solver;
   }
 
-  // Fazer busca local em cada solução, substituir pelo ótimo local
-  if (false) {
-    for (int i = 0; i < kSetSize && elapsed_time < total_time_ms; ++i) {
-      VnsSolver* solver = solver_factory->NewVnsSolver(Globals::instance());
-      solver->Init(SolverOptions());
-      ProblemSolution s = R.GetSolution(i);
-      uint64 local_time_to_best = 0;
-      VLOG(log) << "PathRelink: updating solution " << i << " (cost: " << s.cost()
-                << "), with its local optima.";
-      sw->Start();
-      LocalSearch::VNSIntensification(solver, Globals::instance()->n(), total_time_ms,
-                                      local_search_time_ms,
-                                      log + 1, &local_time_to_best, &s);
-      if (R.AddSolution(s)) {
-        if (s.cost() < final_status->final_sol.cost()) {
-          final_status->final_sol = s;
-          time_to_best = elapsed_time + local_time_to_best;
-        }
-        VLOG(log) << "PathRelink: updated solution " << i << " with new local minima: "
-                  << s.cost();
-      }
-      sw->Stop(); elapsed_time += sw->ElapsedMilliseconds; sw->Reset();
-      delete solver;
-    }
-  }
-
   // Enquanto criterio de parada nao for atingido
+  VnsSolver* solver_diver = solver_factory->NewVnsSolver(Globals::instance());
+  solver_diver->Init(SolverOptions());
   while (elapsed_time < total_time_ms) {
     // Um conjunto de soluções a serem otimizadas
     vector<ProblemSolution*> S;
 
     // Achar as X melhores soluções no caminho de A para B, adicionar a S
-    const int X = 10;
+    const int X = 18;
     while (S.size() < X && elapsed_time < total_time_ms) {
       VLOG(log) << "PathRelink: relink step, " << X - S.size() << " still remaining.";
       // Escolher aleatóriamente duas soluções de R
-      const int kNumSolEllipsoidal = 2;
-      set<int> sol_indices;
+      const int kNumSolEllipsoidal = Globals::rg()->IRandom(3, 5);
       vector<const ProblemSolution*> sol_in_ellipse;
-      sol_in_ellipse.reserve(kNumSolEllipsoidal);
-      while (sol_indices.size() < kNumSolEllipsoidal) {
-        int sol_to_insert = Globals::rg()->IRandom(0, R.size() - 1);
-        if (sol_indices.insert(sol_to_insert).second) {
-          sol_in_ellipse.push_back(R.GetSolutionPtr(sol_to_insert));
-          VLOG(log)
-              << "Selecting for path relink solution " << sol_to_insert << ", cost: "
-              << sol_in_ellipse[sol_in_ellipse.size() - 1]->cost();
-        }
-      }
+      PickNSolutions(kNumSolEllipsoidal, log + 1, R, &sol_in_ellipse);
+
       // TODO(danielrocha): talvez fazer mutacao nas solucoes?
 
       uint64 time_elapsed_ms = 0;
       vector<ProblemSolution*> new_solutions;
-      VnsSolver* solver_diver = solver_factory->NewVnsSolver(Globals::instance());
-      solver_diver->Init(SolverOptions());
       sw->Start();
       bool feasible =
           LocalSearch::EllipsoidalSearch(
-              solver_diver, sol_in_ellipse, total_time_ms - elapsed_time, local_search_time_ms,
-              log, true, &time_elapsed_ms, &S);
-      delete solver_diver;
+              solver_diver, sol_in_ellipse, total_time_ms - elapsed_time,
+              local_search_time_ms, log, 4, &time_elapsed_ms, &S);
       sw->Stop(); elapsed_time += sw->ElapsedMilliseconds; sw->Reset();
+      for (int i = S.size() - 4; S.size() >= 4 && i < S.size(); ++i) {
+        if (S[i]->cost() < final_status->final_sol.cost()) {
+          final_status->final_sol = *S[i];
+          time_to_best = elapsed_time;
+        }
+      }
 
       if (feasible) {
         VLOG(log) << "PathRelink: inserted result of path relink into S, num solutions: "
@@ -720,10 +734,9 @@ void LocalSearch::PathRelink(SolverFactory* solver_factory,
     }
 
     // Enquanto existirem soluções a ser otimizadas em S:
+    VnsSolver* solver_inten = solver_factory->NewVnsSolver(Globals::instance());
+    solver_inten->Init(SolverOptions());
     while (S.size() > 0 && elapsed_time < total_time_ms) {
-      VnsSolver* solver_inten = solver_factory->NewVnsSolver(Globals::instance());
-      solver_inten->Init(SolverOptions());
-
       // Escolher uma solução aleatória, otimizar, remover de S
       int picked_sol = Globals::rg()->IRandom(0, S.size() - 1);
       ProblemSolution* s = S[picked_sol];
@@ -731,10 +744,10 @@ void LocalSearch::PathRelink(SolverFactory* solver_factory,
       VLOG(log) << "PathRelink: intensifying solution from S, current cost: " << s->cost()
                 << ", position: " << picked_sol << ", S size: " << S.size();
       sw->Start();
-      LocalSearch::SimpleOPTSearch(solver_inten, 10, local_search_time_ms, log + 1, s);
+      LocalSearch::SimpleOPTSearch(solver_inten, 10, local_search_time_ms / 2, log + 1, s);
       //LocalSearch::VNSIntensification(
-      //    solver_inten, Globals::instance()->n(), total_time_ms - elapsed_time,
-      //    local_search_time_ms, log + 1, &local_time_to_best, s);
+      //    solver_inten, 10, 10, local_search_time_ms,
+      //    local_search_time_ms / 2, log + 1, &local_time_to_best, s);
 
       // Tentar adicionar o ótimo local a R
       if (R.AddSolution(*s)) {
@@ -753,9 +766,179 @@ void LocalSearch::PathRelink(SolverFactory* solver_factory,
       delete S[S.size() - 1];
       S.pop_back();
 
-      delete solver_inten;
     }
+    delete solver_inten;
     VLOG(log) << "PathRelink: best solution so far: " << final_status->final_sol.cost()
               << ", elapsed time: " << elapsed_time / 1000.0;
   }
+  delete solver_diver;
+  final_status->str_status = "heuristic";
+  final_status->time_to_best_solution = time_to_best / 1000.0;
+
+  VLOG(log) << "PathRelink: starting post processing";
+  VnsSolver* solver = solver_factory->NewVnsSolver(Globals::instance());
+  solver->Init(SolverOptions());
+  ProblemSolution best_result(final_status->final_sol);
+  for (int cont = 0; cont <= 3; ++cont) {
+    vector<const ProblemSolution*> sols;
+    vector<ProblemSolution*> result;
+    PickNSolutions(Globals::rg()->IRandom(4, 6), log + 1, R, &sols);
+    sw->Start();
+    uint64 time = 0;
+    bool feasible = LocalSearch::EllipsoidalSearch(
+        solver, sols, total_time_ms,
+        local_search_time_ms, log, -1, &time, &result);
+    sw->Stop(); elapsed_time += sw->ElapsedMilliseconds; sw->Reset();
+    if (feasible && result.size() >= 1) {
+      VLOG(log) << "PathRelink: post-processing step " << cont << ", best solution: "
+                << sols[0]->cost();
+      if (result[0]->cost() < best_result.cost()) {
+        VLOG(log) << "PathRelink: post-processing step found BETTER solution: "
+                  << result[0]->cost() << ", time: "
+                  << (elapsed_time + time) / 1000.0;
+        best_result = (*result[0]);
+        //time_to_best = elapsed_time + time;
+      }
+    } else {
+      VLOG(log) << "PathRelink: post-processing step " << cont << ", failed.";
+    }
+  }
+  delete solver;
+  VLOG(log) << "PathRelink: done, final result: " << final_status->final_sol.cost()
+            << ", time to best: " << time_to_best / 1000.0 << ", total time: " << elapsed_time; 
+}
+
+void LocalSearch::CalculateDistances(int num_sols, const FixedSizeSolutionSet& R,
+                                     const vector<vector<int> >& distance,
+                                     vector<pair<int, vector<int> > >* sol_indices) {
+  vector<int> v;
+  for (int sol1 = 0; sol1 < R.size(); ++sol1) {
+    v.push_back(sol1);
+    for (int sol2 = sol1 + 1; sol2 < R.size(); ++sol2) {
+      int dist2 = distance[sol1][sol2];
+      v.push_back(sol2);
+      if (num_sols == 2) {
+        sol_indices->push_back(make_pair(dist2, v));
+        continue;
+      }
+      for (int sol3 = sol2 + 1; sol3 < R.size(); ++sol3) {
+        int dist3 = dist2 + distance[sol1][sol3] + distance[sol2][sol3];
+        v.push_back(sol3);
+        if (num_sols == 3) {
+          sol_indices->push_back(make_pair(dist3, v));
+          continue;
+        }
+        for (int sol4 = sol3 + 1; sol4 < R.size(); ++sol4) {
+          int dist4 = (dist3 + distance[sol1][sol4] + distance[sol2][sol4] +
+                       distance[sol3][sol4]);
+          v.push_back(sol4);
+          sol_indices->push_back(make_pair(dist4, v));
+          v.pop_back();
+        }
+        v.pop_back();
+      }
+      v.pop_back();
+    }
+    v.pop_back();
+  }
+  sort(sol_indices->rbegin(), sol_indices->rend());
+}
+
+void LocalSearch::PostProcessing(SolverFactory* solver_factory,
+                                 uint64 total_time_ms,
+                                 uint64 local_search_time_ms,
+                                 int log,
+                                 SolverStatus* final_status) {
+  uint64 elapsed_time = 0;
+  Stopwatch^ sw = gcnew Stopwatch();
+  FixedSizeSolutionSet R(20);
+
+  // Calculates the remaining time for the post processing
+  const int K = 15;
+  uint64 cplex_time = total_time_ms - K * local_search_time_ms;
+  VnsSolver* solver = solver_factory->NewVnsSolver(Globals::instance());
+  solver->Init(SolverOptions());
+  {
+    // Runs CPLEX + Populate
+    PopulateOptions options;
+    options.set_max_time(cplex_time / 1000.0);
+    options.set_num_max_solutions(100);
+    PopulateStatus status;
+    VLOG(log) << "PostProcessing: calling solver with TL = "
+              << cplex_time / 1000.0;
+    solver->Init(options);
+    sw->Start();
+    solver->Populate(options, &status);
+    sw->Stop(); elapsed_time += sw->ElapsedMilliseconds; sw->Reset();
+    if (status.status == OPTSTAT_FEASIBLE || status.status == OPTSTAT_MIPOPTIMAL) {
+      for (int i = 0; i < status.solution_set.size(); ++i) {
+        if (i == 0 || status.solution_set[i].cost() < final_status->final_sol.cost()) {
+          final_status->final_sol = status.solution_set[i];
+          final_status->time_to_best_solution = elapsed_time / 1000.0;
+        }
+        if (R.AddSolution(status.solution_set[i]))
+          VLOG(log) << "PostProcessing: added solution " << R.size() << ", cost: "
+                    << status.solution_set[i].cost();
+      }
+      VLOG(log) << "PostProcessing: finished solver with status = "
+          << status.status << ", best solution "
+          << final_status->final_sol.cost();
+    } else {
+      VLOG(log) << "PostProcessing: FAIL!!";
+      final_status->status = OPTSTAT_INFEASIBLE;
+      return;
+    }
+  }
+  VLOG(log) << "PostProcessing: starting recombination step.";
+
+  vector<vector<int> > distance(R.size(), vector<int>(R.size(), 0));
+  for (int i = 0; i < R.size(); ++i)
+    for (int j = i + 1; j < R.size(); ++j)
+      distance[i][j] = distance[j][i] = R.GetSolution(i).Distance(R.GetSolution(j));
+
+  while (elapsed_time < total_time_ms) {
+    for (int num_sols = 2; num_sols <= 4; ++num_sols) {
+
+      vector<pair<int, vector<int> > > sol_indices;
+      LocalSearch::CalculateDistances(num_sols, R, distance, &sol_indices);
+
+      for (int repet = 0; repet < K / (4 - 2 + 1); ++repet) {
+        vector<const ProblemSolution*> sols;
+        vector<ProblemSolution*> result;
+        //LocalSearch::PickNSolutions(num_sols, log, R, &sols);
+        for (int i = 0; i < num_sols; ++i) {
+          VLOG(log) << "PostProcessing: picking solution: " << sol_indices[repet].second[i]
+                    << ", cost: " << R.GetSolution(sol_indices[repet].second[i]).cost()
+                    << ", total distance: " << sol_indices[repet].first;
+          sols.push_back(R.GetSolutionPtr(sol_indices[repet].second[i]));
+        }
+
+        sw->Start();
+        uint64 time = 0;
+        bool feasible = LocalSearch::EllipsoidalSearch(
+            solver, sols, total_time_ms,
+            local_search_time_ms, log, -1, &time, &result, final_status->final_sol.cost());
+        sw->Stop(); elapsed_time += sw->ElapsedMilliseconds; sw->Reset();
+        if (feasible && result.size() >= 1) {
+          VLOG(log) << "PostProcessing: num_sols: " << num_sols << ", repet: " << repet
+                    << " best solution: " << result[0]->cost();
+          if (result[0]->cost() < final_status->final_sol.cost()) {
+            VLOG(log) << "PostProcessing: found BEST solution, cost: "
+                      << result[0]->cost();
+            final_status->final_sol = *(result[0]);
+            final_status->time_to_best_solution = elapsed_time / 1000.0;
+          }
+          delete result[0];
+        } else {
+          VLOG(log) << "PostProcessing: num_sols: " << num_sols << ", repet: " << repet
+                    << " fail.";
+        }
+      }
+
+      VLOG(log) << "PostProcessing: finished num_sols: " << num_sols << " best solution: "
+                << final_status->final_sol.cost() << ", time elapsed: "
+                << elapsed_time / 1000.0;
+    }
+  }
+  delete solver;
 }

@@ -115,10 +115,10 @@ int main(int argc, char* argv[]) {
 		solver->Solve(options, &status);
 		sw->Stop();
 	} else if (algorithm == "VNSBra") {
-    options.set_time_for_first_solution(60);
+    //options.set_time_for_first_solution(60);
 		sw->Start();
     LocalSearch::VNSBra(solver_factory, options.max_time() * 1000,
-                        120 * 1000, 5, &status);
+                        300 * 1000, 5, &status);
 		sw->Stop();
 	} else if (algorithm == "Memetic") {
 		sw->Start();
@@ -128,6 +128,11 @@ int main(int argc, char* argv[]) {
     sw->Start();
     LocalSearch::PathRelink(solver_factory, options.max_time() * 1000,
                             120 * 1000, 1, &status);
+    sw->Stop();
+  } else if (algorithm == "PostProcessing") {
+    sw->Start();
+    LocalSearch::PostProcessing(solver_factory, options.max_time() * 1000,
+                                120 * 1000, 1, &status);
     sw->Stop();
   } else {
     LOG(FATAL) << "Inexistent algorithm specified: " << algorithm;
