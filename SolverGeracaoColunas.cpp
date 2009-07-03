@@ -261,7 +261,7 @@ double SolverGeracaoColunas::GenerateColumns(const ProblemData& p,
     }
 
     objective_value = lp->getObjVal();
-    VLOG_EVERY_N(4, 50)
+    VLOG_EVERY_N(4, 197)
       << "GenerateColumns: loop start, objective_value: " << objective_value
       << ", status: " << status;
 
@@ -310,6 +310,7 @@ double SolverGeracaoColunas::GenerateColumns(const ProblemData& p,
       // Os precos de cada tarefa para o problema da mochila, ajustados
       // em relação à fixação ou não das variáveis.
       int num_usable_tasks = 0;
+      int total_possible_consume = 0;
       for (int task = 0; task < p.num_tasks(); ++task) {
         int price = static_cast<int>(dual_values[task] * 100.0) -
                     (p.cost(machine, task) * 100);
@@ -330,14 +331,18 @@ double SolverGeracaoColunas::GenerateColumns(const ProblemData& p,
           prices[num_usable_tasks] = price;
           used_tasks[num_usable_tasks] = task;
           consume_vector[num_usable_tasks] = p.consume(machine, task);
+          total_possible_consume += consume_vector[num_usable_tasks];
           ++num_usable_tasks;
         }
       }
 
-      int knapsack_value = minknap(num_usable_tasks, &prices[0],
-                                   const_cast<int*>(&consume_vector[0]),
-                                   &knapsack_result[0],
-                                   p.capacity(machine) - used_capacity);
+      if (total_possible_consume <= p.capacity(machine) - used_capacity) {
+        VLOG_EVERY_N(5, 197) << "GenerateColumns: trivial knapsack case.";
+        fill(knapsack_result.begin(), knapsack_result.end(), 1);
+      } else {
+        minknap(num_usable_tasks, &prices[0], const_cast<int*>(&consume_vector[0]),
+                &knapsack_result[0], p.capacity(machine) - used_capacity);
+      }
 
       // Adiciona à solução encontrada as variáveis fixadas
       for(int task = 0; task < p.num_tasks(); ++task) {
